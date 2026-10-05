@@ -14,11 +14,32 @@ ActTrace 는 ChatTrace 를 **라이브러리로 import** 한다. 포크하지 �
 포크하면 한쪽만 고치고 잊는다. E01/dd/vmdk 입력도 `chattrace.image` 를
 그대로 쓴다.
 
+## 폴더 구조
+
+```
+claude_app/
+  tools/
+    ActTrace.cmd        행위 재구성 진입점
+    ChatTrace.cmd       대화 복원 진입점
+    actrace/            ActTrace 패키지 (파서 8 · 규칙 39종)
+    chattrace/          ChatTrace 패키지 — ActTrace 가 import 한다
+      image/            E01 / dd / vmdk 직접 읽기 (마운트 안 한다)
+    tests/              통제 테스트 10개
+  demo_result/
+    ActTrace/           실측 산출물 11종
+    ChatTrace/          실측 산출물 8종
+  산출물-설명.md
+```
+
+`actrace` 와 `chattrace` 는 **별개 패키지 둘**이다. 한 폴더에 같이 있는
+이유는 ActTrace 가 ChatTrace 를 라이브러리로 쓰기 때문이고, 포크해서
+두 벌로 두면 한쪽만 고치고 잊는다.
+
 ## 돌리는 법
 
 ```
-tools\ChatTrace\ChatTrace.cmd <이미지|수집물> <환경> <저장경로>
-tools\ChatTrace\ActTrace.cmd  <이미지|수집물> <환경> <저장경로>
+tools\ChatTrace.cmd <이미지|수집물> <환경> <저장경로>
+tools\ActTrace.cmd  <이미지|수집물> <환경> <저장경로>
 ```
 
 위치 인자 셋은 **이미지 · 환경 · 저장 경로** 순서다 (2026-10-05 팀 합의).
@@ -82,7 +103,7 @@ ActTrace.cmd "D:\사건\CASE01.E01" claude-desktop/msix "C:\사건\CASE01-행위
   프롬프트 수정과는 29분 차. **앱이 세션 정리하며 비운 것**이라 B03 으로
   옮겼다. 단독 증거로 못 쓰고 시간축 보조로만 쓴다
 
-통제 테스트 10개(양성·음성·회귀)는 `tools/ChatTrace/tests/test_payloads.py`
+통제 테스트 10개(양성·음성·회귀)는 `tools/tests/test_payloads.py`
 에 있다. 전부 통과한다.
 
 ## 알아야 할 것 — 앱 버전이 복원 범위를 가른다
