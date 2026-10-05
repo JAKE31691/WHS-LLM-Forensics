@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chattrace"
+version = "1.0.0"
+description = "Claude Desktop 대화 아티팩트 복원 도구"
+requires-python = ">=3.8"
+dependencies = []          # 표준 라이브러리만 쓴다
+
+[project.optional-dependencies]
+# 캐시에 brotli 로 눌린 HTTP 응답이 있을 때만 필요하다. 없어도 동작한다.
+brotli = ["brotli"]
+
+[project.scripts]
+ChatTrace = "chattrace.app:main"
+chattrace = "chattrace.app:main"
+
+[tool.setuptools]
+packages = ["chattrace"]

@@ -1,0 +1,4 @@
+﻿id,source_artifact,source_path,parser,parser_status,parser_note
+obs:0834,userassist,kape\C\Users\Default\NTUSER.DAT,userassist,partial,UserAssist 키가 이 하이브에 없다. 트랜잭션 로그 미반영일 수 있다
+obs:0838,userassist,kape\C\Windows\ServiceProfiles\LocalService\NTUSER.DAT,userassist,partial,UserAssist 키가 이 하이브에 없다. 트랜잭션 로그 미반영일 수 있다
+obs:0839,userassist,kape\C\Windows\ServiceProfiles\NetworkService\NTUSER.DAT,userassist,partial,UserAssist 키가 이 하이브에 없다. 트랜잭션 로그 미반영일 수 있다
