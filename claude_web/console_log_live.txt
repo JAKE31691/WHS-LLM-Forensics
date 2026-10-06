@@ -1,4 +1,4 @@
-C:\Users\choonsik\Desktop>py main5.py live ./result_test2
+C:\Users\choonsik\Desktop>py main.py live ./result_test2
 LLM Artifact Analyzer v1.3.0
 Author: jbsquad
 Contact: jbsquad000@gmail.com
