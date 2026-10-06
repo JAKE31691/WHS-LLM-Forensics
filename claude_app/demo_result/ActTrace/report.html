@@ -1,0 +1,997 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ActTrace 행위 재구성</title><style>
+:root{--bg:#faf9f7;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e0ddd8;--card:#fff;
+--c1:#2563eb;--c2:#7c3aed;--c3:#ca8a04;--c4:#9ca3af;--hi:#fef3c7}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
+--bg:#1a1917;--fg:#eceae6;--dim:#9a958d;--line:#33312e;--card:#242220;
+--c1:#60a5fa;--c2:#a78bfa;--c3:#fbbf24;--c4:#6b7280;--hi:#422006}}
+:root[data-theme=dark]{--bg:#1a1917;--fg:#eceae6;--dim:#9a958d;--line:#33312e;
+--card:#242220;--c1:#60a5fa;--c2:#a78bfa;--c3:#fbbf24;--c4:#6b7280;--hi:#422006}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+font:14px/1.6 -apple-system,"Segoe UI","Malgun Gothic",sans-serif;
+word-break:keep-all;overflow-wrap:anywhere}
+.wrap{max-width:1180px;margin:0 auto;padding:24px 16px 80px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--dim);font-size:13px;margin-bottom:18px}
+.meta{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;
+font-size:12px;color:var(--dim);margin-bottom:22px}
+.meta b{font-weight:600;color:var(--fg)}
+.mono{font-family:ui-monospace,Consolas,"D2Coding",monospace;font-size:12px}
+h2.sec{font-size:14px;margin:26px 0 10px;padding-bottom:6px;
+border-bottom:1px solid var(--line);color:var(--dim);font-weight:600;
+letter-spacing:.02em}
+.g{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;
+border-radius:3px;white-space:nowrap}
+.gd{background:var(--c1);color:#fff}
+.gs{background:transparent;color:var(--dim);border:1px solid var(--line)}
+.legend{font-size:12px;color:var(--dim);margin:-8px 0 4px}
+.legend .g{margin-right:5px}
+.legend div{margin:3px 0}
+.pathcell{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
+.axis{position:relative;height:26px;margin:0 0 6px;border-bottom:1px solid var(--line)}
+.axis span{position:absolute;top:6px;font-size:11px;color:var(--dim);
+transform:translateX(-50%);white-space:nowrap}
+.box{background:var(--card);border:1px solid var(--line);border-radius:8px;
+margin-bottom:10px;overflow:hidden}
+.box>summary{list-style:none;cursor:pointer;padding:10px 14px;display:flex;
+gap:10px;align-items:center;flex-wrap:wrap}
+.box>summary::-webkit-details-marker{display:none}
+.box>summary:hover{background:var(--hi)}
+.code{font-weight:700;font-size:12px;padding:2px 7px;border-radius:4px;
+background:var(--c1);color:#fff;flex:none}
+.bname{font-weight:600}
+.cnt{color:var(--dim);font-size:12px;margin-left:auto;flex:none}
+.track{position:relative;height:30px;margin:2px 14px 10px;
+border-top:1px dashed var(--line)}
+.pin{position:absolute;top:6px;width:11px;height:11px;border-radius:50%;
+border:2px solid var(--card);cursor:pointer;transform:translateX(-50%)}
+.pin:hover{outline:2px solid var(--fg)}
+.lv-confirmed{background:var(--c1)}.lv-suspected{background:var(--c2)}
+.lv-presumed{background:var(--c3)}.lv-undecided{background:var(--c4)}
+.inner{padding:0 14px 14px}
+.sum{font-size:13px;color:var(--dim);margin:0 0 10px}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);
+vertical-align:top}
+th{color:var(--dim);font-weight:600;white-space:nowrap}
+tr.row{cursor:pointer}tr.row:hover{background:var(--hi)}
+.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:3px;
+border:1px solid var(--line);color:var(--dim);margin-right:4px}
+#panel{position:fixed;right:0;top:0;bottom:0;width:min(440px,92vw);
+background:var(--card);border-left:1px solid var(--line);padding:18px;
+overflow:auto;transform:translateX(100%);transition:transform .18s;z-index:9}
+#panel.on{transform:none;box-shadow:-8px 0 24px rgba(0,0,0,.14)}
+#panel h2{font-size:15px;margin:0 0 2px}
+#panel .x{position:absolute;right:12px;top:10px;cursor:pointer;
+color:var(--dim);font-size:20px;line-height:1;border:0;background:none}
+.kv{display:grid;grid-template-columns:72px 1fr;gap:3px 10px;font-size:12.5px;
+margin:10px 0}
+.kv b{color:var(--dim);font-weight:600}
+.path{background:var(--bg);border:1px solid var(--line);border-radius:6px;
+padding:8px;margin:6px 0;font-family:ui-monospace,Consolas,monospace;
+font-size:11.5px}
+.btn{font:inherit;font-size:11.5px;padding:3px 9px;border:1px solid var(--line);
+border-radius:5px;background:var(--bg);color:var(--fg);cursor:pointer;
+margin:4px 6px 0 0}
+.btn:hover{background:var(--hi)}
+.alt{font-size:12px;color:var(--dim);border-left:2px solid var(--c3);
+padding-left:8px;margin:6px 0}
+.note{font-size:12px;color:var(--dim);margin-top:16px;padding-top:10px;
+border-top:1px solid var(--line)}
+@media(max-width:640px){.wrap{padding:16px}#panel{width:100%}}
+</style></head><body>
+<div class="wrap">
+<h1>ActTrace — 행위 재구성</h1>
+<div class="sub">타임라인 위 상자가 행위, 점이 근거 하나다. 점을 누르면 그 근거가 나온 <b>파일 경로</b>가 나온다.</div>
+<h2 class="sec">개요</h2>
+<div class="meta">
+<b>입력</b><span class="mono">C:\Forensics\runs\B01\T7</span>
+<b>지문</b><span class="mono">dirdigest:3f456331a880ca382a2f743948abe828b35ea8a2ac88a1db760a326fc89bc4f8</span>
+<b>환경</b><span class="mono">claude-desktop/msix</span>
+<b>도구</b><span class="mono">ActTrace 1.3.0 (명세 v1)</span>
+<b>실행</b><span class="mono">2026-10-05T11:26:42.410Z ~ 2026-10-05T11:26:49.834Z</span>
+<b>결과</b><span class="mono">관찰 863 · 추론 92 · 문제 3</span>
+</div>
+<div class="legend">
+<div><span class="g gd">직접</span>그 아티팩트 한 종류만으로 확정 판정이 선 경우 (행위와 직접 귀속)</div>
+<div><span class="g gs">보조</span>다른 아티팩트와 함께 봐야 하거나, 확정 아래 등급인 경우 (추측 · 정황상 증거)</div>
+</div>
+<h2 class="sec">행위</h2>
+<div class="axis">
+<span style="left:0%">02:03:43</span>
+<span style="left:50%">·</span>
+<span style="left:100%">15:33:41</span>
+</div>
+<details class="box">
+<summary onclick="showBox('B01')">
+<span class="code">B01</span>
+<span class="bname">사이트 접속 · 설치 및 실행</span>
+<span class="cnt">직접 18 · 보조 4 · 근거 46</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>bam</td><td class="pathcell">kape\C\Windows\System32\config\SYSTEM</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>browser_history</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Microsoft\Edge\User Data\Default\History</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>mft</td><td class="pathcell">Program Files\WindowsApps\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>mft</td><td class="pathcell">ProgramData\Microsoft\Windows\AppRepository\Packages\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>mft</td><td class="pathcell">Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>mft</td><td class="pathcell">Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE SETUP.EXE-9F370D47.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-0659240F.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-06592410.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-06592411.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-06592413.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-06592419.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-0659241A.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-0659241B.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>prefetch</td><td class="pathcell">kape\C\Windows\prefetch\CLAUDE.EXE-0659241D.pf</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>userassist</td><td class="pathcell">kape\C\Users\Kwon\NTUSER.DAT</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>applog</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>userassist</td><td class="pathcell">kape\C\Users\Default\NTUSER.DAT</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>userassist</td><td class="pathcell">kape\C\Windows\ServiceProfiles\LocalService\NTUSER.DAT</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>userassist</td><td class="pathcell">kape\C\Windows\ServiceProfiles\NetworkService\NTUSER.DAT</td><td><span class="g gs">보조</span></td></tr>
+</table></div>
+<p class="sum">근거 46건 · 아티팩트 7종 — applog, bam, browser_history, localstorage, mft, prefetch, userassist</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0083')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>userassist</td>
+<td>Kwon 직접 실행 0회</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0086')">
+<td class="mono">—</td>
+<td>판정불가</td>
+<td>userassist</td>
+<td>UserAssist 없음 — 직접 실행 여부 판정 불가</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0087')">
+<td class="mono">—</td>
+<td>판정불가</td>
+<td>userassist</td>
+<td>UserAssist 없음 — 직접 실행 여부 판정 불가</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0088')">
+<td class="mono">—</td>
+<td>판정불가</td>
+<td>userassist</td>
+<td>UserAssist 없음 — 직접 실행 여부 판정 불가</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0091')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>browser_history</td>
+<td>검색어 3종</td>
+<td class="mono">3건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0089')">
+<td class="mono">02:03:43.263</td>
+<td>확정</td>
+<td>mft</td>
+<td>설치 4단계 순서 정상</td>
+<td class="mono">4건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0090')">
+<td class="mono">02:02:23.039</td>
+<td>확정</td>
+<td>browser_history</td>
+<td>AI 서비스 방문 12건 · 로그인 전 화면 2건</td>
+<td class="mono">12건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0025')">
+<td class="mono">02:03:26.310</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE SETUP.EXE 실행 2회</td>
+<td class="mono">3건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0082')">
+<td class="mono">02:04:12.538</td>
+<td>확정</td>
+<td>bam</td>
+<td>SID 2643766-1001 · 대상 2개</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0001')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0002')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0003')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0004')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0005')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0006')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0007')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0008')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0009')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0010')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0011')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0012')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0013')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0014')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0015')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0016')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0017')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0018')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0019')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0020')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0021')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0022')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0023')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0024')">
+<td class="mono">02:04:23.965</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱 버전 2.2553.1</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0026')">
+<td class="mono">06:13:32.763</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE [메인] 실행 10회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0029')">
+<td class="mono">06:13:33.162</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 10회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0027')">
+<td class="mono">06:13:34.581</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 17회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0031')">
+<td class="mono">06:20:13.399</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 15회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0032')">
+<td class="mono">06:20:17.065</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 15회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0081')">
+<td class="mono">06:20:35.149</td>
+<td>확정</td>
+<td>applog · localstorage</td>
+<td>UTC+9시간 (짝 4개, 오차 1655ms 이내)</td>
+<td class="mono">8건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0033')">
+<td class="mono">06:20:48.275</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 15회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0028')">
+<td class="mono">06:20:48.278</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 15회 · 시각 8개</td>
+<td class="mono">9건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0030')">
+<td class="mono">06:33:52.683</td>
+<td>확정</td>
+<td>prefetch</td>
+<td>CLAUDE.EXE 실행 1회 · 시각 1개</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0085')">
+<td class="mono">06:49:44.722</td>
+<td>확정</td>
+<td>userassist</td>
+<td>Kwon 직접 실행 9회</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0084')">
+<td class="mono">06:49:44.957</td>
+<td>확정</td>
+<td>userassist</td>
+<td>Kwon 직접 실행 9회</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0034')">
+<td class="mono">11:04:19.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>앱 기동 10건</td>
+<td class="mono">10건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0035')">
+<td class="mono">11:04:24.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>claude.ai 로드 14건</td>
+<td class="mono">12건</td>
+</tr>
+</table></div></div></details>
+<details class="box">
+<summary onclick="showBox('B02')">
+<span class="code">B02</span>
+<span class="bname">로그인 (인증)</span>
+<span class="cnt">직접 16 · 보조 2 · 근거 17</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>cookies</td><td class="pathcell">app\Network\Cookies</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>cookies</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Network\Cookies</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\claude-code-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\claude-code-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\local-agent-mode-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\local-agent-mode-sessions\skills-plugin\45543fda-8483-4e56-a0cd-84f711a63ab0</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\local-agent-mode-sessions\skills-plugin\84f1e338-3681-4143-87c8-e224a4b8fd08</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\skills-plugin\45543fda-8483-4e56-a0cd-84f711a63ab0</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\skills-plugin\84f1e338-3681-4143-87c8-e224a4b8fd08</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>plan_usage</td><td class="pathcell">app\plan-usage-history.json</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>plan_usage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\plan-usage-history.json</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>applog</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gs">보조</span></td></tr>
+</table></div>
+<p class="sum">근거 17건 · 아티팩트 5종 — applog, cookies, identity_dir, localstorage, plan_usage</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0067')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>identity_dir</td>
+<td>계정 7612a620-8de / 조직 45543fda-848 (claude-code-sess·local-agent-mode)</td>
+<td class="mono">3건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0068')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>identity_dir</td>
+<td>계정 7612a620-8de / 조직 84f1e338-368 (claude-code-sess·local-agent-mode·skills-plugin)</td>
+<td class="mono">5건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0069')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>identity_dir</td>
+<td>계정 88c48471-0af / 조직 45543fda-848 (claude-code-sess·local-agent-mode·skills-plugin)</td>
+<td class="mono">5건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0071')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>cookies</td>
+<td>세션 쿠키 sessionKey,sessionKeyLC 잔존 — 수집 시점에 로그인 상태</td>
+<td class="mono">8건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0065')">
+<td class="mono">06:14:39.923</td>
+<td>확정</td>
+<td>plan_usage</td>
+<td>조직 84f1e338-3681-4143 · 표본 6건</td>
+<td class="mono">6건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0061')">
+<td class="mono">06:14:54.820</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>이벤트 170건</td>
+<td class="mono">12건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0047')">
+<td class="mono">06:20:17.881</td>
+<td>추정</td>
+<td>localstorage</td>
+<td>앱 이벤트 claudeai.desktop.sidebar.profile_menu_opened 2건</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0062')">
+<td class="mono">06:33:41.067</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>이벤트 122건</td>
+<td class="mono">12건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0064')">
+<td class="mono">06:33:42.015</td>
+<td>확정</td>
+<td>plan_usage</td>
+<td>조직 45543fda-8483-4e56 · 표본 6건</td>
+<td class="mono">6건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0036')">
+<td class="mono">11:04:24.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>계정 정보 수신 12건</td>
+<td class="mono">12건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0077')">
+<td class="mono">15:14:38.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>계정 없음 / 조직 84f1e338-368</td>
+<td class="mono">8건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0037')">
+<td class="mono">15:14:39.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>세션 적재 20건</td>
+<td class="mono">12건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0072')">
+<td class="mono">15:14:39.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>로그인 7612a620-8deb- (clearing)</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0079')">
+<td class="mono">15:14:39.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>계정 7612a620-8de / 조직 84f1e338-368</td>
+<td class="mono">10건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0074')">
+<td class="mono">15:32:35.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>동일 계정 재로그인 7612a620-8deb- (preserving)</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0078')">
+<td class="mono">15:33:40.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>계정 7612a620-8de / 조직 45543fda-848</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0080')">
+<td class="mono">15:33:41.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>계정 88c48471-0af / 조직 45543fda-848</td>
+<td class="mono">11건</td>
+</tr>
+</table></div></div></details>
+<details class="box">
+<summary onclick="showBox('B03')">
+<span class="code">B03</span>
+<span class="bname">로그아웃</span>
+<span class="cnt">직접 2 · 보조 1 · 근거 10</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>applog</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="g gs">보조</span></td></tr>
+</table></div>
+<p class="sum">근거 10건 · 아티팩트 2종 — applog, localstorage</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0040')">
+<td class="mono">06:20:35.149</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱이 로그아웃 시각을 직접 기록한 값</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0042')">
+<td class="mono">06:20:35.149</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱이 로그아웃 시각을 직접 기록한 값</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0052')">
+<td class="mono">06:20:35.197</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>세션 정리 과정에서 입력창이 비워졌다</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0054')">
+<td class="mono">06:20:35.197</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>세션 정리 과정에서 입력창이 비워졌다</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0041')">
+<td class="mono">06:33:11.655</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱이 로그아웃 시각을 직접 기록한 값</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0043')">
+<td class="mono">06:33:11.655</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>앱이 로그아웃 시각을 직접 기록한 값</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0053')">
+<td class="mono">06:33:11.722</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>세션 정리 과정에서 입력창이 비워졌다</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0055')">
+<td class="mono">06:33:11.722</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>세션 정리 과정에서 입력창이 비워졌다</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0073')">
+<td class="mono">15:20:34.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>로그아웃 — 직전 계정 7612a620-8deb-</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0075')">
+<td class="mono">15:33:10.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>로그아웃 — 직전 계정 7612a620-8deb-</td>
+<td class="mono">1건</td>
+</tr>
+</table></div></div></details>
+<details class="box" open>
+<summary onclick="showBox('B04')">
+<span class="code">B04</span>
+<span class="bname">계정 전환</span>
+<span class="cnt">직접 9 · 보조 1 · 근거 4</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\claude-code-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">app\local-agent-mode-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>identity_dir</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>plan_usage</td><td class="pathcell">app\plan-usage-history.json</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>plan_usage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\plan-usage-history.json</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>applog</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="g gs">보조</span></td></tr>
+</table></div>
+<p class="sum">근거 4건 · 아티팩트 4종 — applog, identity_dir, localstorage, plan_usage</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0063')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>계정 2개가 이 기기에서 쓰였다</td>
+<td class="mono">4건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0070')">
+<td class="mono">—</td>
+<td>확정</td>
+<td>identity_dir</td>
+<td>계정 2개가 이 기기에서 쓰였다</td>
+<td class="mono">6건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0066')">
+<td class="mono">06:32:35.885</td>
+<td>확정</td>
+<td>plan_usage</td>
+<td>84f1e338-368 → 45543fda-848</td>
+<td class="mono">2건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0076')">
+<td class="mono">15:33:41.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>계정 전환 7612a620-8de → 88c48471-0af (clearing)</td>
+<td class="mono">1건</td>
+</tr>
+</table></div></div></details>
+<details class="box" open>
+<summary onclick="showBox('B05')">
+<span class="code">B05</span>
+<span class="bname">새 대화(세션) 생성</span>
+<span class="cnt">직접 0 · 보조 2 · 근거 1</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gs">보조</span></td></tr>
+</table></div>
+<p class="sum">근거 1건 · 아티팩트 1종 — localstorage</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0044')">
+<td class="mono">06:14:56.904</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>앱 이벤트 claudeai.page.new_chat_input_ready 8건</td>
+<td class="mono">8건</td>
+</tr>
+</table></div></div></details>
+<details class="box">
+<summary onclick="showBox('B06')">
+<span class="code">B06</span>
+<span class="bname">Prompt 입력</span>
+<span class="cnt">직접 3 · 보조 0 · 근거 9</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>indexeddb</td><td class="pathcell">conversations.json</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gd">직접</span></td></tr>
+</table></div>
+<p class="sum">근거 9건 · 아티팩트 2종 — indexeddb, localstorage</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0056')">
+<td class="mono">06:40:02.263</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>응답 수신 — 첫 글자까지 1.7초 · 전체 355.8초</td>
+<td class="mono">8건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0057')">
+<td class="mono">06:40:02.263</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>응답 수신 — 첫 글자까지 1.7초 · 전체 355.8초</td>
+<td class="mono">8건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0092')">
+<td class="mono">06:40:02.263</td>
+<td>확정</td>
+<td>indexeddb</td>
+<td>Python list basics · 메시지 6개</td>
+<td class="mono">6건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0048')">
+<td class="mono">06:45:41.942</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>앱 이벤트 claudeai.conversation.recent.opened 6건</td>
+<td class="mono">6건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0050')">
+<td class="mono">06:45:41.963</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>대화를 열었다 8e590cf4-23e3-4f64</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0058')">
+<td class="mono">06:45:51.461</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>응답 수신 — 첫 글자까지 1.5초 · 전체 6.6초</td>
+<td class="mono">7건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0059')">
+<td class="mono">06:45:51.461</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>응답 수신 — 첫 글자까지 1.5초 · 전체 6.6초</td>
+<td class="mono">7건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0060')">
+<td class="mono">06:45:51.462</td>
+<td>확정</td>
+<td>localstorage</td>
+<td>발신자미상 메시지 식별자에서 역산</td>
+<td class="mono">1건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0051')">
+<td class="mono">06:49:52.480</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>대화를 열었다 2378175d-bb1d-4f8b</td>
+<td class="mono">1건</td>
+</tr>
+</table></div></div></details>
+<details class="box" open>
+<summary onclick="showBox('B11')">
+<span class="code">B11</span>
+<span class="bname">대화/계정 데이터 삭제</span>
+<span class="cnt">직접 0 · 보조 0 · 근거 1</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td colspan="3">근거 관찰에 경로가 붙지 않았다</td></tr>
+</table></div>
+<p class="sum">근거 1건 · 아티팩트 0종 — </p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0049')">
+<td class="mono">—</td>
+<td>판정불가</td>
+<td>—</td>
+<td>대화 2378175d-bb1d-4f8b-84ff-4a5f5b8a17e2 — 삭제 여부 판정 불가</td>
+<td class="mono">0건</td>
+</tr>
+</table></div></div></details>
+<details class="box" open>
+<summary onclick="showBox('B13')">
+<span class="code">B13</span>
+<span class="bname">외부 서비스 연동 (connector)</span>
+<span class="cnt">직접 0 · 보조 3 · 근거 4</span>
+</summary>
+<div class="track">
+</div>
+<div class="inner">
+<div class="scroll"><table>
+<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>
+<tr><td>applog</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">app\Local Storage\leveldb</td><td><span class="g gs">보조</span></td></tr>
+<tr><td>localstorage</td><td class="pathcell">kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="g gs">보조</span></td></tr>
+</table></div>
+<p class="sum">근거 4건 · 아티팩트 2종 — applog, localstorage</p>
+<div class="scroll"><table><tr><th>시각</th><th>등급</th><th>출처</th><th>내용</th><th>근거</th></tr>
+<tr class="row" onclick="showPin('inf:0045')">
+<td class="mono">06:14:56.937</td>
+<td>유력</td>
+<td>localstorage</td>
+<td>앱 이벤트 mcp.servers.listed 10건</td>
+<td class="mono">10건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0046')">
+<td class="mono">06:14:57.506</td>
+<td>추정</td>
+<td>localstorage</td>
+<td>앱 이벤트 claudeai.mcp.bootstrap_stream.completed 8건</td>
+<td class="mono">8건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0039')">
+<td class="mono">11:04:19.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>MCP 설정 읽음 10건</td>
+<td class="mono">10건</td>
+</tr>
+<tr class="row" onclick="showPin('inf:0038')">
+<td class="mono">15:14:40.000</td>
+<td>유력</td>
+<td>applog</td>
+<td>OAuth 실패 29건</td>
+<td class="mono">12건</td>
+</tr>
+</table></div></div></details>
+<div class="note">아티팩트 내용은 이 보고서에 싣지 않는다. Cache 나 History 처럼 큰 것은 한 화면에 담기지 않으므로, 경로를 주고 직접 확인하게 한다. 판단 근거의 원본은 <span class="mono">observations.jsonl</span> 에 있다.</div>
+</div>
+<aside id="panel"><button class="x" onclick="closeP()">&times;</button><div id="pbody"></div></aside>
+<script>
+var DATA={"pins": [{"id": "inf:0001", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0001", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x4485 seq=5 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0002", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0003", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x4485 seq=11 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0003", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0005", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x4485 seq=15 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0004", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0079", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=86 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0005", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0084", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=101 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0006", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0094", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=186 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0007", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0096", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=202 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0008", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0098", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=206 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0009", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0164", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x4AAC seq=360 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0010", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0167", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x4AAC seq=389 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0011", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0189", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x3E5D seq=414 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0012", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0213", "artifact": "localstorage", "type": "app_version_seen", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x89C0 seq=431 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0013", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0231", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x4485 seq=5 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0014", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0233", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x4485 seq=11 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0015", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0235", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x4485 seq=15 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0016", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0309", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=86 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0017", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0314", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=101 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0018", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0324", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=186 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0019", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0326", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=202 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0020", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0328", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x55B6 seq=206 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0021", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0394", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x4AAC seq=360 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0022", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0397", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x4AAC seq=389 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0023", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0419", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x3E5D seq=414 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0024", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:04:23.965Z", "to": "2026-09-19T02:04:23.965Z", "span": 0.0, "rule": "R-FIRSTRUN-01", "basis": "앱이 스스로 적은 최초 인지 시각(firstSeenEpochMs)", "note": "앱 버전 2.2553.1", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0443", "artifact": "localstorage", "type": "app_version_seen", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x89C0 seq=431 key=persisted.desktop-version-seen", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0025", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:03:26.310Z", "to": "2026-09-19T02:03:37.922Z", "span": 11.612, "rule": "R-INSTALL-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 2개의 처음과 끝", "note": "CLAUDE SETUP.EXE 실행 2회", "alts": [".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0461", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE SETUP.EXE-9F370D47.pf", "locator": "CLAUDE SETUP.EXE-9F370D47.pf", "status": "ok"}, {"id": "obs:0462", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE SETUP.EXE-9F370D47.pf", "locator": "CLAUDE SETUP.EXE-9F370D47.pf 실행시각", "status": "ok"}, {"id": "obs:0463", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE SETUP.EXE-9F370D47.pf", "locator": "CLAUDE SETUP.EXE-9F370D47.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0026", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:13:32.763Z", "to": "2026-09-19T06:49:44.946Z", "span": 2172.183, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE [메인] 실행 10회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 10회 중 2회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0464", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf", "status": "ok"}, {"id": "obs:0465", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0466", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0467", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0468", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0469", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0470", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0471", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}, {"id": "obs:0472", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659240F.pf", "locator": "CLAUDE.EXE-0659240F.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0027", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:13:34.581Z", "to": "2026-09-19T06:39:51.139Z", "span": 1576.558, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE 실행 17회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 17회 중 9회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0473", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf", "status": "ok"}, {"id": "obs:0474", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0475", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0476", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0477", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0478", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0479", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0480", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}, {"id": "obs:0481", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592410.pf", "locator": "CLAUDE.EXE-06592410.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0028", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:20:48.278Z", "to": "2026-09-19T06:49:45.587Z", "span": 1737.309, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE 실행 15회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 15회 중 7회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0482", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf", "status": "ok"}, {"id": "obs:0483", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0484", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0485", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0486", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0487", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0488", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0489", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}, {"id": "obs:0490", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592411.pf", "locator": "CLAUDE.EXE-06592411.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0029", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:13:33.162Z", "to": "2026-09-19T06:49:45.216Z", "span": 2172.054, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE 실행 10회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 10회 중 2회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0491", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf", "status": "ok"}, {"id": "obs:0492", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0493", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0494", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0495", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0496", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0497", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0498", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}, {"id": "obs:0499", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592413.pf", "locator": "CLAUDE.EXE-06592413.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0030", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:33:52.683Z", "to": "2026-09-19T06:33:52.683Z", "span": 0.0, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 1개의 처음과 끝", "note": "CLAUDE.EXE 실행 1회 · 시각 1개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0500", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592419.pf", "locator": "CLAUDE.EXE-06592419.pf", "status": "ok"}, {"id": "obs:0501", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-06592419.pf", "locator": "CLAUDE.EXE-06592419.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0031", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:20:13.399Z", "to": "2026-09-19T06:49:45.634Z", "span": 1772.235, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE 실행 15회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 15회 중 7회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0502", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf", "status": "ok"}, {"id": "obs:0503", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0504", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0505", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0506", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0507", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0508", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0509", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}, {"id": "obs:0510", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241A.pf", "locator": "CLAUDE.EXE-0659241A.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0032", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:20:17.065Z", "to": "2026-09-19T06:49:49.400Z", "span": 1772.335, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE 실행 15회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 15회 중 7회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0511", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf", "status": "ok"}, {"id": "obs:0512", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0513", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0514", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0515", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0516", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0517", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0518", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}, {"id": "obs:0519", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241B.pf", "locator": "CLAUDE.EXE-0659241B.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0033", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:20:48.275Z", "to": "2026-09-19T06:49:49.394Z", "span": 1741.119, "rule": "R-RUN-PF-01", "basis": "Prefetch 에 남은 마지막 실행 시각 8개의 처음과 끝", "note": "CLAUDE.EXE 실행 15회 · 시각 8개", "alts": ["자동 시작·업데이트·자식 프로세스로도 실행될 수 있다 — 사람이 눌렀다는 증거는 아니다", "실행 15회 중 7회는 시각이 없다 — Prefetch 는 마지막 8회만 남긴다", ".pf 가 설치 이후에 새로 만들어졌다 — 이 횟수는 전체가 아니라 알 수 없는 시점 이후의 횟수다"], "arts": ["prefetch"], "ev": [{"id": "obs:0520", "artifact": "prefetch", "type": "program_run_summary", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf", "status": "ok"}, {"id": "obs:0521", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0522", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0523", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0524", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0525", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0526", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0527", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}, {"id": "obs:0528", "artifact": "prefetch", "type": "program_run", "path": "kape\\C\\Windows\\prefetch\\CLAUDE.EXE-0659241D.pf", "locator": "CLAUDE.EXE-0659241D.pf 실행시각", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0034", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "suspected", "from": "2026-09-19T11:04:19.000", "to": "2026-09-19T15:49:45.000", "span": 17126.0, "rule": "R-APPSTART-LOG-01", "basis": "앱 로그 10줄 (로컬 시각 · 타임존 미상)", "note": "앱 기동 10건", "alts": ["로그 시각에 타임존이 없다 — 다른 UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0529", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:1", "status": "ok"}, {"id": "obs:0545", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:709", "status": "ok"}, {"id": "obs:0552", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:1405", "status": "ok"}, {"id": "obs:0589", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2346", "status": "ok"}, {"id": "obs:0606", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2812", "status": "ok"}, {"id": "obs:0627", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3744", "status": "ok"}, {"id": "obs:0636", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4434", "status": "ok"}, {"id": "obs:0680", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5950", "status": "ok"}, {"id": "obs:0697", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6463", "status": "ok"}, {"id": "obs:0713", "artifact": "applog", "type": "app_log_app_start", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6971", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0035", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "suspected", "from": "2026-09-19T11:04:24.000", "to": "2026-09-19T15:49:48.000", "span": 17124.0, "rule": "R-PAGELOAD-LOG-01", "basis": "앱 로그 14줄 (로컬 시각 · 타임존 미상)", "note": "claude.ai 로드 14건", "alts": ["로그 시각에 타임존이 없다 — 다른 UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0536", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:136", "status": "ok"}, {"id": "obs:0547", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:813", "status": "ok"}, {"id": "obs:0554", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:1533", "status": "ok"}, {"id": "obs:0591", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2479", "status": "ok"}, {"id": "obs:0608", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2947", "status": "ok"}, {"id": "obs:0620", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3295", "status": "ok"}, {"id": "obs:0623", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3322", "status": "ok"}, {"id": "obs:0629", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3848", "status": "ok"}, {"id": "obs:0638", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4562", "status": "ok"}, {"id": "obs:0657", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5343", "status": "ok"}, {"id": "obs:0660", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5356", "status": "ok"}, {"id": "obs:0682", "artifact": "applog", "type": "app_log_page_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6083", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0036", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T11:04:24.000", "to": "2026-09-19T15:49:48.000", "span": 17124.0, "rule": "R-ACCTLOG-01", "basis": "앱 로그 12줄 (로컬 시각 · 타임존 미상)", "note": "계정 정보 수신 12건", "alts": ["로그 시각에 타임존이 없다 — 다른 UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0539", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:219", "status": "ok"}, {"id": "obs:0548", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:894", "status": "ok"}, {"id": "obs:0555", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:1614", "status": "ok"}, {"id": "obs:0566", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2125", "status": "ok"}, {"id": "obs:0592", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2481", "status": "ok"}, {"id": "obs:0609", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2950", "status": "ok"}, {"id": "obs:0630", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3929", "status": "ok"}, {"id": "obs:0639", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4643", "status": "ok"}, {"id": "obs:0647", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5160", "status": "ok"}, {"id": "obs:0683", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6085", "status": "ok"}, {"id": "obs:0700", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6625", "status": "ok"}, {"id": "obs:0716", "artifact": "applog", "type": "app_log_account", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:7109", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0037", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:14:39.000", "to": "2026-09-19T15:49:48.000", "span": 2109.0, "rule": "R-SESSLOAD-LOG-01", "basis": "앱 로그 20줄 (로컬 시각 · 타임존 미상)", "note": "세션 적재 20건", "alts": ["로그 시각에 타임존이 없다 — 다른 UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0569", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2138", "status": "ok"}, {"id": "obs:0596", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2594", "status": "ok"}, {"id": "obs:0597", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2595", "status": "ok"}, {"id": "obs:0599", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2609", "status": "ok"}, {"id": "obs:0612", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2968", "status": "ok"}, {"id": "obs:0613", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2969", "status": "ok"}, {"id": "obs:0615", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3058", "status": "ok"}, {"id": "obs:0650", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5172", "status": "ok"}, {"id": "obs:0651", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5173", "status": "ok"}, {"id": "obs:0664", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5787", "status": "ok"}, {"id": "obs:0672", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5864", "status": "ok"}, {"id": "obs:0687", "artifact": "applog", "type": "app_log_session_load", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6192", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0038", "b": "B13", "name": "외부 서비스 연동 (connector)", "q": "Q4", "level": "suspected", "from": "2026-09-19T15:14:40.000", "to": "2026-09-19T15:49:48.000", "span": 2108.0, "rule": "R-OAUTHFAIL-LOG-01", "basis": "앱 로그 29줄 (로컬 시각 · 타임존 미상)", "note": "OAuth 실패 29건", "alts": ["로그 시각에 타임존이 없다 — 다른 UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0572", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2170", "status": "ok"}, {"id": "obs:0573", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2174", "status": "ok"}, {"id": "obs:0574", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2176", "status": "ok"}, {"id": "obs:0583", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2202", "status": "ok"}, {"id": "obs:0593", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2564", "status": "ok"}, {"id": "obs:0600", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2623", "status": "ok"}, {"id": "obs:0601", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2625", "status": "ok"}, {"id": "obs:0602", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2638", "status": "ok"}, {"id": "obs:0616", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3064", "status": "ok"}, {"id": "obs:0617", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3102", "status": "ok"}, {"id": "obs:0618", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3104", "status": "ok"}, {"id": "obs:0644", "artifact": "applog", "type": "app_log_oauth_fail", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5151", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0039", "b": "B13", "name": "외부 서비스 연동 (connector)", "q": "Q4", "level": "suspected", "from": "2026-09-19T11:04:19.000", "to": "2026-09-19T15:49:45.000", "span": 17126.0, "rule": "R-MCPCONF-LOG-01", "basis": "앱 로그 10줄 (로컬 시각 · 타임존 미상)", "note": "MCP 설정 읽음 10건", "alts": ["로그 시각에 타임존이 없다 — 다른 UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0530", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:9", "status": "ok"}, {"id": "obs:0546", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:717", "status": "ok"}, {"id": "obs:0553", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:1413", "status": "ok"}, {"id": "obs:0590", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2354", "status": "ok"}, {"id": "obs:0607", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2820", "status": "ok"}, {"id": "obs:0628", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3752", "status": "ok"}, {"id": "obs:0637", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4442", "status": "ok"}, {"id": "obs:0681", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5958", "status": "ok"}, {"id": "obs:0698", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6471", "status": "ok"}, {"id": "obs:0714", "artifact": "applog", "type": "app_log_mcp_config", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6979", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0040", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:20:35.149Z", "to": "2026-09-19T06:20:35.149Z", "span": 0.0, "rule": "R-LOGOUT-01", "basis": "앱이 로그아웃 시각을 직접 기록한 값", "note": "", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0093", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x4D2A seq=182 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0041", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:33:11.655Z", "to": "2026-09-19T06:33:11.655Z", "span": 0.0, "rule": "R-LOGOUT-01", "basis": "앱이 로그아웃 시각을 직접 기록한 값", "note": "", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0162", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x42D9 seq=349 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0042", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:20:35.149Z", "to": "2026-09-19T06:20:35.149Z", "span": 0.0, "rule": "R-LOGOUT-01", "basis": "앱이 로그아웃 시각을 직접 기록한 값", "note": "", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0323", "artifact": "localstorage", "type": "logout_at", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x4D2A seq=182 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0043", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:33:11.655Z", "to": "2026-09-19T06:33:11.655Z", "span": 0.0, "rule": "R-LOGOUT-01", "basis": "앱이 로그아웃 시각을 직접 기록한 값", "note": "", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0392", "artifact": "localstorage", "type": "logout_at", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x42D9 seq=349 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0044", "b": "B05", "name": "새 대화(세션) 생성", "q": "Q3", "level": "suspected", "from": "2026-09-19T06:14:56.904Z", "to": "2026-09-19T06:33:41.498Z", "span": 1124.594, "rule": "R-NEWCHAT-01", "basis": "앱 이벤트 claudeai.page.new_chat_input_ready 8건", "note": "", "alts": ["앱을 켜면 새 대화 화면이 기본으로 뜬다 — 실제 입력 없이도 발생한다"], "arts": ["localstorage"], "ev": [{"id": "obs:0024", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0054", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x0 seq=74 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0254", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0284", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x0 seq=74 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0111", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0341", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0145", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0375", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0045", "b": "B13", "name": "외부 서비스 연동 (connector)", "q": "Q4", "level": "suspected", "from": "2026-09-19T06:14:56.937Z", "to": "2026-09-19T06:33:41.530Z", "span": 1124.593, "rule": "R-CONNECTOR-01", "basis": "앱 이벤트 mcp.servers.listed 10건", "note": "", "alts": ["앱이 시작할 때 자동으로 목록을 조회한다 — 사용자 조작이 아닐 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0025", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0055", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x0 seq=74 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0255", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0285", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x0 seq=74 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0113", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0343", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0117", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0347", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0146", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0376", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0046", "b": "B13", "name": "외부 서비스 연동 (connector)", "q": "Q4", "level": "presumed", "from": "2026-09-19T06:14:57.506Z", "to": "2026-09-19T06:33:41.999Z", "span": 1124.493, "rule": "R-CONNECTOR-02", "basis": "앱 이벤트 claudeai.mcp.bootstrap_stream.completed 8건", "note": "", "alts": ["부팅 시 자동 수행"], "arts": ["localstorage"], "ev": [{"id": "obs:0027", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0057", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x0 seq=74 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0257", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0287", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000003.ldb+0x0 seq=74 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0114", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0344", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0148", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0378", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "추정"}, {"id": "inf:0047", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "presumed", "from": "2026-09-19T06:20:17.881Z", "to": "2026-09-19T06:20:17.881Z", "span": 0.0, "rule": "R-PROFILE-01", "basis": "앱 이벤트 claudeai.desktop.sidebar.profile_menu_opened 2건", "note": "", "alts": ["프로필 메뉴를 열었을 뿐 계정을 바꾸지 않았을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0081", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x1B14 seq=97 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0311", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x1B14 seq=97 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "추정"}, {"id": "inf:0048", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "suspected", "from": "2026-09-19T06:45:41.942Z", "to": "2026-09-19T06:49:52.463Z", "span": 250.521, "rule": "R-REOPEN-01", "basis": "앱 이벤트 claudeai.conversation.recent.opened 6건", "note": "", "alts": ["목록에서 스쳐 지나가며 열렸을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0191", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0421", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0195", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0425", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0215", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x8D62 seq=437 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0445", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x8D62 seq=437 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0049", "b": "B11", "name": "대화/계정 데이터 삭제", "q": "Q5", "level": "undecided", "from": "", "to": "", "span": null, "rule": "R-ABSENCE-01", "basis": "장부에 d 플래그가 없다", "note": "대화 2378175d-bb1d-4f8b-84ff-4a5f5b8a17e2 — 삭제 여부 판정 불가", "alts": ["아직 안 지웠다", "지웠지만 장부가 갱신되기 전 스냅샷만 남았다"], "arts": [], "ev": [], "levelKo": "판정불가"}, {"id": "inf:0050", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "suspected", "from": "2026-09-19T06:45:41.963Z", "to": "2026-09-19T06:45:41.963Z", "span": 0.0, "rule": "R-REVISIT-01", "basis": "기기별 재방문 기록의 마지막 열람 시각", "note": "대화를 열었다 8e590cf4-23e3-4f64", "alts": ["대화를 열기만 하고 입력하지 않았을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0209", "artifact": "localstorage", "type": "conversation_revisit", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=422 key=conversation-revisits-device", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0051", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "suspected", "from": "2026-09-19T06:49:52.480Z", "to": "2026-09-19T06:49:52.480Z", "span": 0.0, "rule": "R-REVISIT-01", "basis": "기기별 재방문 기록의 마지막 열람 시각", "note": "대화를 열었다 2378175d-bb1d-4f8b", "alts": ["대화를 열기만 하고 입력하지 않았을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0228", "artifact": "localstorage", "type": "conversation_revisit", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x8D62 seq=441 key=conversation-revisits-device", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0052", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "suspected", "from": "2026-09-19T06:20:35.197Z", "to": "2026-09-19T06:20:35.197Z", "span": 0.0, "rule": "R-DRAFT-WIPED-01", "basis": "앱이 입력창을 비운 시각을 직접 기록한 값", "note": "세션 정리 과정에서 입력창이 비워졌다", "alts": ["우연히 같은 시각대에 사용자가 직접 비웠을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0091", "artifact": "localstorage", "type": "draft_wiped_at", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x206C seq=175 key=chat-draft-wipe-completed-at", "status": "ok"}, {"id": "obs:0093", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x4D2A seq=182 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0053", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "suspected", "from": "2026-09-19T06:33:11.722Z", "to": "2026-09-19T06:33:11.722Z", "span": 0.0, "rule": "R-DRAFT-WIPED-01", "basis": "앱이 입력창을 비운 시각을 직접 기록한 값", "note": "세션 정리 과정에서 입력창이 비워졌다", "alts": ["우연히 같은 시각대에 사용자가 직접 비웠을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0160", "artifact": "localstorage", "type": "draft_wiped_at", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x1C96 seq=331 key=chat-draft-wipe-completed-at", "status": "ok"}, {"id": "obs:0162", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x42D9 seq=349 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0054", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "suspected", "from": "2026-09-19T06:20:35.197Z", "to": "2026-09-19T06:20:35.197Z", "span": 0.0, "rule": "R-DRAFT-WIPED-01", "basis": "앱이 입력창을 비운 시각을 직접 기록한 값", "note": "세션 정리 과정에서 입력창이 비워졌다", "alts": ["우연히 같은 시각대에 사용자가 직접 비웠을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0321", "artifact": "localstorage", "type": "draft_wiped_at", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x206C seq=175 key=chat-draft-wipe-completed-at", "status": "ok"}, {"id": "obs:0093", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x4D2A seq=182 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0055", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "suspected", "from": "2026-09-19T06:33:11.722Z", "to": "2026-09-19T06:33:11.722Z", "span": 0.0, "rule": "R-DRAFT-WIPED-01", "basis": "앱이 입력창을 비운 시각을 직접 기록한 값", "note": "세션 정리 과정에서 입력창이 비워졌다", "alts": ["우연히 같은 시각대에 사용자가 직접 비웠을 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0390", "artifact": "localstorage", "type": "draft_wiped_at", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x1C96 seq=331 key=chat-draft-wipe-completed-at", "status": "ok"}, {"id": "obs:0162", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x42D9 seq=349 key=epitaxy-context-usage-logout-at", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0056", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "confirmed", "from": "2026-09-19T06:40:02.263Z", "to": "2026-09-19T06:45:58.022Z", "span": 355.759, "rule": "R-REPLY-TIMING-01", "basis": "앱이 적은 전송·수신 이벤트 시각", "note": "응답 수신 — 첫 글자까지 1.7초 · 전체 355.8초", "alts": ["이벤트 큐는 앱이 스스로 적은 것이다 — 응답 본문이 실제로 무엇이었는지는 알 수 없다"], "arts": ["localstorage"], "ev": [{"id": "obs:0173", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0175", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0405", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0176", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0406", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0178", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0408", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0202", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0057", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "confirmed", "from": "2026-09-19T06:40:02.263Z", "to": "2026-09-19T06:45:58.022Z", "span": 355.759, "rule": "R-REPLY-TIMING-01", "basis": "앱이 적은 전송·수신 이벤트 시각", "note": "응답 수신 — 첫 글자까지 1.7초 · 전체 355.8초", "alts": ["이벤트 큐는 앱이 스스로 적은 것이다 — 응답 본문이 실제로 무엇이었는지는 알 수 없다"], "arts": ["localstorage"], "ev": [{"id": "obs:0403", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0175", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0405", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0176", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0406", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0178", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0408", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x0 seq=398 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0202", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0058", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "confirmed", "from": "2026-09-19T06:45:51.461Z", "to": "2026-09-19T06:45:58.022Z", "span": 6.561, "rule": "R-REPLY-TIMING-01", "basis": "앱이 적은 전송·수신 이벤트 시각", "note": "응답 수신 — 첫 글자까지 1.5초 · 전체 6.6초", "alts": ["이벤트 큐는 앱이 스스로 적은 것이다 — 응답 본문이 실제로 무엇이었는지는 알 수 없다"], "arts": ["localstorage"], "ev": [{"id": "obs:0201", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0202", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0432", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0203", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0433", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0205", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0435", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0059", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "confirmed", "from": "2026-09-19T06:45:51.461Z", "to": "2026-09-19T06:45:58.022Z", "span": 6.561, "rule": "R-REPLY-TIMING-01", "basis": "앱이 적은 전송·수신 이벤트 시각", "note": "응답 수신 — 첫 글자까지 1.5초 · 전체 6.6초", "alts": ["이벤트 큐는 앱이 스스로 적은 것이다 — 응답 본문이 실제로 무엇이었는지는 알 수 없다"], "arts": ["localstorage"], "ev": [{"id": "obs:0431", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0202", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0432", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0203", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0433", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0205", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0435", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x41EC seq=420 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0060", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "confirmed", "from": "2026-09-19T06:45:51.462Z", "to": "2026-09-19T06:45:51.462Z", "span": 0.0, "rule": "R-REPLY-UUID7-01", "basis": "메시지 UUIDv7 상위 48비트 = 생성 밀리초", "note": "발신자미상 메시지 식별자에서 역산", "alts": ["식별자 생성 시각이다 — 전송·수신 시각과 밀리초 단위로 어긋날 수 있다"], "arts": ["localstorage"], "ev": [{"id": "obs:0220", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000009.log+0x8D62 seq=437 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0061", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:14:54.820Z", "to": "2026-09-19T06:32:36.787Z", "span": 1061.967, "rule": "R-ACCOUNT-SEEN-01", "basis": "이 계정으로 기록된 앱 이벤트의 처음과 마지막", "note": "이벤트 170건", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0013", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0014", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0015", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0016", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0017", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0018", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0019", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0020", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0021", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0022", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0023", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0024", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0062", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:33:41.067Z", "to": "2026-09-19T06:50:26.967Z", "span": 1005.9, "rule": "R-ACCOUNT-SEEN-01", "basis": "이 계정으로 기록된 앱 이벤트의 처음과 마지막", "note": "이벤트 122건", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0140", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0141", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0142", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0143", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0144", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0145", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0146", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0147", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0148", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0149", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0150", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0151", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0063", "b": "B04", "name": "계정 전환", "q": "Q2", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-ACCOUNT-SWITCH-01", "basis": "서로 다른 계정 UUID 가 같은 기기 기록에 공존한다", "note": "계정 2개가 이 기기에서 쓰였다", "alts": [], "arts": ["localstorage"], "ev": [{"id": "obs:0014", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000003.ldb+0x1A0D seq=37 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0355", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x7D4 seq=222 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0141", "artifact": "localstorage", "type": "app_event", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x9D8 seq=325 key=antalytics_queue_v1", "status": "ok"}, {"id": "obs:0455", "artifact": "localstorage", "type": "app_event", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000009.log+0x8D62 seq=437 key=antalytics_queue_v1", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0064", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:33:42.015Z", "to": "2026-09-19T06:45:38.592Z", "span": 716.577, "rule": "R-ORG-SEEN-01", "basis": "이 조직으로 기록된 사용량 표본의 처음과 마지막", "note": "조직 45543fda-8483-4e56 · 표본 6건", "alts": [], "arts": ["plan_usage"], "ev": [{"id": "obs:0732", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[3]", "status": "ok"}, {"id": "obs:0738", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[3]", "status": "ok"}, {"id": "obs:0733", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[4]", "status": "ok"}, {"id": "obs:0739", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[4]", "status": "ok"}, {"id": "obs:0734", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[5]", "status": "ok"}, {"id": "obs:0740", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[5]", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0065", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:14:39.923Z", "to": "2026-09-19T06:32:35.885Z", "span": 1075.962, "rule": "R-ORG-SEEN-01", "basis": "이 조직으로 기록된 사용량 표본의 처음과 마지막", "note": "조직 84f1e338-3681-4143 · 표본 6건", "alts": [], "arts": ["plan_usage"], "ev": [{"id": "obs:0729", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[0]", "status": "ok"}, {"id": "obs:0735", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[0]", "status": "ok"}, {"id": "obs:0730", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[1]", "status": "ok"}, {"id": "obs:0736", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[1]", "status": "ok"}, {"id": "obs:0731", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[2]", "status": "ok"}, {"id": "obs:0737", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[2]", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0066", "b": "B04", "name": "계정 전환", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:32:35.885Z", "to": "2026-09-19T06:33:42.015Z", "span": 66.13, "rule": "R-ORG-SWITCH-01", "basis": "직전 표본과 조직이 바뀐 첫 표본 사이", "note": "84f1e338-368 → 45543fda-848", "alts": [], "arts": ["plan_usage"], "ev": [{"id": "obs:0737", "artifact": "plan_usage", "type": "plan_sample", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\plan-usage-history.json", "locator": "samples[2]", "status": "ok"}, {"id": "obs:0732", "artifact": "plan_usage", "type": "plan_sample", "path": "app\\plan-usage-history.json", "locator": "samples[3]", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0067", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-IDDIR-01", "basis": "계정 식별자 디렉터리의 존재 (시각은 이 근거로 못 낸다)", "note": "계정 7612a620-8de / 조직 45543fda-848 (claude-code-sess·local-agent-mode)", "alts": ["식별자는 로그아웃·계정전환·계정삭제를 모두 견딘다 — 지금도 로그인 중이라는 뜻은 아니다"], "arts": ["identity_dir"], "ev": [{"id": "obs:0741", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0746", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\claude-code-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "claude-code-sessions", "status": "ok"}, {"id": "obs:0749", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\claude-code-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "claude-code-sessions", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0068", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-IDDIR-01", "basis": "계정 식별자 디렉터리의 존재 (시각은 이 근거로 못 낸다)", "note": "계정 7612a620-8de / 조직 84f1e338-368 (claude-code-sess·local-agent-mode·skills-plugin)", "alts": ["식별자는 로그아웃·계정전환·계정삭제를 모두 견딘다 — 지금도 로그인 중이라는 뜻은 아니다"], "arts": ["identity_dir"], "ev": [{"id": "obs:0742", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0744", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0747", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\claude-code-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "claude-code-sessions", "status": "ok"}, {"id": "obs:0751", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\skills-plugin\\84f1e338-3681-4143-87c8-e224a4b8fd08", "locator": "skills-plugin", "status": "ok"}, {"id": "obs:0753", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\skills-plugin\\84f1e338-3681-4143-87c8-e224a4b8fd08", "locator": "skills-plugin", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0069", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-IDDIR-01", "basis": "계정 식별자 디렉터리의 존재 (시각은 이 근거로 못 낸다)", "note": "계정 88c48471-0af / 조직 45543fda-848 (claude-code-sess·local-agent-mode·skills-plugin)", "alts": ["식별자는 로그아웃·계정전환·계정삭제를 모두 견딘다 — 지금도 로그인 중이라는 뜻은 아니다"], "arts": ["identity_dir"], "ev": [{"id": "obs:0743", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\88c48471-0af1-48bc-b6b9-de2d2c446788", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0745", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\88c48471-0af1-48bc-b6b9-de2d2c446788", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0748", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\claude-code-sessions\\88c48471-0af1-48bc-b6b9-de2d2c446788", "locator": "claude-code-sessions", "status": "ok"}, {"id": "obs:0750", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\skills-plugin\\45543fda-8483-4e56-a0cd-84f711a63ab0", "locator": "skills-plugin", "status": "ok"}, {"id": "obs:0752", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\skills-plugin\\45543fda-8483-4e56-a0cd-84f711a63ab0", "locator": "skills-plugin", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0070", "b": "B04", "name": "계정 전환", "q": "Q2", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-MULTIACCT-DIR-01", "basis": "서로 다른 계정 UUID 디렉터리가 공존한다", "note": "계정 2개가 이 기기에서 쓰였다", "alts": [], "arts": ["identity_dir"], "ev": [{"id": "obs:0741", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0746", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\claude-code-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "claude-code-sessions", "status": "ok"}, {"id": "obs:0742", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0744", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\7612a620-8deb-4893-8ab3-fba8eb0e105d", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0743", "artifact": "identity_dir", "type": "account_org_pair", "path": "app\\local-agent-mode-sessions\\88c48471-0af1-48bc-b6b9-de2d2c446788", "locator": "local-agent-mode-sessions", "status": "ok"}, {"id": "obs:0745", "artifact": "identity_dir", "type": "account_org_pair", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\local-agent-mode-sessions\\88c48471-0af1-48bc-b6b9-de2d2c446788", "locator": "local-agent-mode-sessions", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0071", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "confirmed", "from": "", "to": "2026-09-19T06:33:40.150Z", "span": null, "rule": "R-SESSION-LIVE-01", "basis": "세션 쿠키가 만들어진 시각", "note": "세션 쿠키 sessionKey,sessionKeyLC 잔존 — 수집 시점에 로그인 상태", "alts": [], "arts": ["cookies"], "ev": [{"id": "obs:0770", "artifact": "cookies", "type": "cookie", "path": "app\\Network\\Cookies", "locator": "page=5 offset=3068", "status": "ok"}, {"id": "obs:0771", "artifact": "cookies", "type": "cookie", "path": "app\\Network\\Cookies", "locator": "page=5 offset=3031", "status": "ok"}, {"id": "obs:0785", "artifact": "cookies", "type": "cookie", "path": "app\\Network\\Cookies", "locator": "page=7 offset=2122", "status": "ok"}, {"id": "obs:0786", "artifact": "cookies", "type": "cookie", "path": "app\\Network\\Cookies", "locator": "page=7 offset=1963", "status": "ok"}, {"id": "obs:0806", "artifact": "cookies", "type": "cookie", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Network\\Cookies", "locator": "page=5 offset=3068", "status": "ok"}, {"id": "obs:0807", "artifact": "cookies", "type": "cookie", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Network\\Cookies", "locator": "page=5 offset=3031", "status": "ok"}, {"id": "obs:0821", "artifact": "cookies", "type": "cookie", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Network\\Cookies", "locator": "page=7 offset=2122", "status": "ok"}, {"id": "obs:0822", "artifact": "cookies", "type": "cookie", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Network\\Cookies", "locator": "page=7 offset=1963", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0072", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:14:39.000", "to": "2026-09-19T15:14:39.000", "span": 0.0, "rule": "R-LOGIN-LOGLINE-01", "basis": "앱 로그의 로그인 상태 전이 줄 (로컬 시각 · 타임존 미상)", "note": "로그인 7612a620-8deb- (clearing)", "alts": ["최초 로그인인지 재로그인인지는 이 줄만으로 모른다", "로그 시각에 타임존이 없다 — UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0565", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2122", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0073", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:20:34.000", "to": "2026-09-19T15:20:34.000", "span": 0.0, "rule": "R-LOGOUT-LOGLINE-01", "basis": "앱 로그의 로그인 상태 전이 줄 (로컬 시각 · 타임존 미상)", "note": "로그아웃 — 직전 계정 7612a620-8deb-", "alts": ["로그 시각에 타임존이 없다 — UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0619", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3285", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0074", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:32:35.000", "to": "2026-09-19T15:32:35.000", "span": 0.0, "rule": "R-RELOGIN-LOGLINE-01", "basis": "앱 로그의 로그인 상태 전이 줄 (로컬 시각 · 타임존 미상)", "note": "동일 계정 재로그인 7612a620-8deb- (preserving)", "alts": ["로그 시각에 타임존이 없다 — UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0646", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5158", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0075", "b": "B03", "name": "로그아웃", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:33:10.000", "to": "2026-09-19T15:33:10.000", "span": 0.0, "rule": "R-LOGOUT-LOGLINE-01", "basis": "앱 로그의 로그인 상태 전이 줄 (로컬 시각 · 타임존 미상)", "note": "로그아웃 — 직전 계정 7612a620-8deb-", "alts": ["로그 시각에 타임존이 없다 — UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0656", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5333", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0076", "b": "B04", "name": "계정 전환", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:33:41.000", "to": "2026-09-19T15:33:41.000", "span": 0.0, "rule": "R-ACCTSWITCH-LOGLINE-01", "basis": "앱 로그의 로그인 상태 전이 줄 (로컬 시각 · 타임존 미상)", "note": "계정 전환 7612a620-8de → 88c48471-0af (clearing)", "alts": ["로그 시각에 타임존이 없다 — UTC 증거와 직접 비교하면 어긋날 수 있다"], "arts": ["applog"], "ev": [{"id": "obs:0669", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5847", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0077", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:14:38.000", "to": "2026-09-19T15:31:55.000", "span": 1037.0, "rule": "R-ACCTORG-LOGLINE-01", "basis": "앱 로그가 계정·조직을 함께 적은 줄 8개", "note": "계정 없음 / 조직 84f1e338-368", "alts": ["로그 시각에 타임존이 없다"], "arts": ["applog"], "ev": [{"id": "obs:0559", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2108", "status": "ok"}, {"id": "obs:0560", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2109", "status": "ok"}, {"id": "obs:0631", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3930", "status": "ok"}, {"id": "obs:0632", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3931", "status": "ok"}, {"id": "obs:0633", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3943", "status": "ok"}, {"id": "obs:0640", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4644", "status": "ok"}, {"id": "obs:0641", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4645", "status": "ok"}, {"id": "obs:0642", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:4657", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0078", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:33:40.000", "to": "2026-09-19T15:33:40.000", "span": 0.0, "rule": "R-ACCTORG-LOGLINE-01", "basis": "앱 로그가 계정·조직을 함께 적은 줄 2개", "note": "계정 7612a620-8de / 조직 45543fda-848", "alts": ["로그 시각에 타임존이 없다"], "arts": ["applog"], "ev": [{"id": "obs:0662", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5779", "status": "ok"}, {"id": "obs:0663", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5780", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0079", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:14:39.000", "to": "2026-09-19T15:32:35.000", "span": 1076.0, "rule": "R-ACCTORG-LOGLINE-01", "basis": "앱 로그가 계정·조직을 함께 적은 줄 10개", "note": "계정 7612a620-8de / 조직 84f1e338-368", "alts": ["로그 시각에 타임존이 없다"], "arts": ["applog"], "ev": [{"id": "obs:0567", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2128", "status": "ok"}, {"id": "obs:0568", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2129", "status": "ok"}, {"id": "obs:0594", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2579", "status": "ok"}, {"id": "obs:0595", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2580", "status": "ok"}, {"id": "obs:0598", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2608", "status": "ok"}, {"id": "obs:0610", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2955", "status": "ok"}, {"id": "obs:0611", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:2956", "status": "ok"}, {"id": "obs:0614", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3057", "status": "ok"}, {"id": "obs:0648", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5163", "status": "ok"}, {"id": "obs:0649", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5164", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0080", "b": "B02", "name": "로그인 (인증)", "q": "Q2", "level": "suspected", "from": "2026-09-19T15:33:41.000", "to": "2026-09-19T15:49:48.000", "span": 967.0, "rule": "R-ACCTORG-LOGLINE-01", "basis": "앱 로그가 계정·조직을 함께 적은 줄 11개", "note": "계정 88c48471-0af / 조직 45543fda-848", "alts": ["로그 시각에 타임존이 없다"], "arts": ["applog"], "ev": [{"id": "obs:0670", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5851", "status": "ok"}, {"id": "obs:0671", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5852", "status": "ok"}, {"id": "obs:0685", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6180", "status": "ok"}, {"id": "obs:0686", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6181", "status": "ok"}, {"id": "obs:0689", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6207", "status": "ok"}, {"id": "obs:0701", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6630", "status": "ok"}, {"id": "obs:0702", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6631", "status": "ok"}, {"id": "obs:0706", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:6736", "status": "ok"}, {"id": "obs:0717", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:7114", "status": "ok"}, {"id": "obs:0718", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:7115", "status": "ok"}, {"id": "obs:0722", "artifact": "applog", "type": "app_log_account_org", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:7220", "status": "ok"}], "levelKo": "유력"}, {"id": "inf:0081", "b": "B01", "name": "기기 타임존 판정", "q": "Q1", "level": "confirmed", "from": "2026-09-19T06:20:35.149Z", "to": "2026-09-19T06:33:11.655Z", "span": 756.506, "rule": "R-TZ-DERIVE-01", "basis": "같은 사건이 UTC 아티팩트와 로컬 로그에 모두 적힌 짝 4개", "note": "UTC+9시간 (짝 4개, 오차 1655ms 이내)", "alts": [], "arts": ["applog", "localstorage"], "ev": [{"id": "obs:0093", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000007.ldb+0x4D2A seq=182 key=epitaxy-context-usage-logout-at", "status": "ok"}, {"id": "obs:0162", "artifact": "localstorage", "type": "logout_at", "path": "app\\Local Storage\\leveldb", "locator": "000010.ldb+0x42D9 seq=349 key=epitaxy-context-usage-logout-at", "status": "ok"}, {"id": "obs:0323", "artifact": "localstorage", "type": "logout_at", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000007.ldb+0x4D2A seq=182 key=epitaxy-context-usage-logout-at", "status": "ok"}, {"id": "obs:0392", "artifact": "localstorage", "type": "logout_at", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude\\Local Storage\\leveldb", "locator": "000010.ldb+0x42D9 seq=349 key=epitaxy-context-usage-logout-at", "status": "ok"}, {"id": "obs:0619", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3285", "status": "ok"}, {"id": "obs:0656", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5333", "status": "ok"}, {"id": "obs:0619", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:3285", "status": "ok"}, {"id": "obs:0656", "artifact": "applog", "type": "app_log_login_transition", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Claude\\logs\\main.log", "locator": "main.log:5333", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0082", "b": "B01", "name": "윈도우 사용자 귀속", "q": "Q2", "level": "confirmed", "from": "2026-09-19T02:04:12.538Z", "to": "2026-09-19T06:21:05.567Z", "span": 15413.029, "rule": "R-BAM-SID-01", "basis": "BAM 이 SID 별로 적은 최종 실행 시각", "note": "SID 2643766-1001 · 대상 2개", "alts": ["BAM 은 최종 실행만 남긴다 — 그 이전 실행의 시각은 없다"], "arts": ["bam"], "ev": [{"id": "obs:0832", "artifact": "bam", "type": "bam_last_run", "path": "kape\\C\\Windows\\System32\\config\\SYSTEM", "locator": "controlset001\\s-1-5-21-4076072684-3337085050-2082643766-1001", "status": "ok"}, {"id": "obs:0833", "artifact": "bam", "type": "bam_last_run", "path": "kape\\C\\Windows\\System32\\config\\SYSTEM", "locator": "controlset001\\s-1-5-21-4076072684-3337085050-2082643766-1001", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0083", "b": "B01", "name": "사용자가 직접 실행", "q": "Q2", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-USERASSIST-01", "basis": "UserAssist 의 마지막 실행 시각", "note": "Kwon 직접 실행 0회", "alts": ["UserAssist 실행 횟수는 과소 계상된다"], "arts": ["userassist"], "ev": [{"id": "obs:0835", "artifact": "userassist", "type": "userassist_run", "path": "kape\\C\\Users\\Kwon\\NTUSER.DAT", "locator": "{cebff5cd-ace2-4f4f-9178-9926f41749ea}", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0084", "b": "B01", "name": "사용자가 직접 실행", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:49:44.957Z", "to": "2026-09-19T06:49:44.957Z", "span": 0.0, "rule": "R-USERASSIST-01", "basis": "UserAssist 의 마지막 실행 시각", "note": "Kwon 직접 실행 9회", "alts": ["UserAssist 실행 횟수는 과소 계상된다"], "arts": ["userassist"], "ev": [{"id": "obs:0836", "artifact": "userassist", "type": "userassist_run", "path": "kape\\C\\Users\\Kwon\\NTUSER.DAT", "locator": "{cebff5cd-ace2-4f4f-9178-9926f41749ea}", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0085", "b": "B01", "name": "사용자가 직접 실행", "q": "Q2", "level": "confirmed", "from": "2026-09-19T06:49:44.722Z", "to": "2026-09-19T06:49:44.722Z", "span": 0.0, "rule": "R-USERASSIST-01", "basis": "UserAssist 의 마지막 실행 시각", "note": "Kwon 직접 실행 9회", "alts": ["UserAssist 실행 횟수는 과소 계상된다"], "arts": ["userassist"], "ev": [{"id": "obs:0837", "artifact": "userassist", "type": "userassist_run", "path": "kape\\C\\Users\\Kwon\\NTUSER.DAT", "locator": "{cebff5cd-ace2-4f4f-9178-9926f41749ea}", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0086", "b": "B01", "name": "사용자가 직접 실행", "q": "Q2", "level": "undecided", "from": "", "to": "", "span": null, "rule": "R-ABSENCE-01", "basis": "UserAssist 키가 이 하이브에 없다", "note": "UserAssist 없음 — 직접 실행 여부 판정 불가", "alts": ["키가 생기기 전이다", "트랜잭션 로그(.LOG1/.LOG2) 를 반영해야 보인다", "MSIX 앱은 기록되지 않았을 수 있다"], "arts": ["userassist"], "ev": [{"id": "obs:0834", "artifact": "userassist", "type": "userassist_absent", "path": "kape\\C\\Users\\Default\\NTUSER.DAT", "locator": "UserAssist", "status": "partial"}], "levelKo": "판정불가"}, {"id": "inf:0087", "b": "B01", "name": "사용자가 직접 실행", "q": "Q2", "level": "undecided", "from": "", "to": "", "span": null, "rule": "R-ABSENCE-01", "basis": "UserAssist 키가 이 하이브에 없다", "note": "UserAssist 없음 — 직접 실행 여부 판정 불가", "alts": ["키가 생기기 전이다", "트랜잭션 로그(.LOG1/.LOG2) 를 반영해야 보인다", "MSIX 앱은 기록되지 않았을 수 있다"], "arts": ["userassist"], "ev": [{"id": "obs:0838", "artifact": "userassist", "type": "userassist_absent", "path": "kape\\C\\Windows\\ServiceProfiles\\LocalService\\NTUSER.DAT", "locator": "UserAssist", "status": "partial"}], "levelKo": "판정불가"}, {"id": "inf:0088", "b": "B01", "name": "사용자가 직접 실행", "q": "Q2", "level": "undecided", "from": "", "to": "", "span": null, "rule": "R-ABSENCE-01", "basis": "UserAssist 키가 이 하이브에 없다", "note": "UserAssist 없음 — 직접 실행 여부 판정 불가", "alts": ["키가 생기기 전이다", "트랜잭션 로그(.LOG1/.LOG2) 를 반영해야 보인다", "MSIX 앱은 기록되지 않았을 수 있다"], "arts": ["userassist"], "ev": [{"id": "obs:0839", "artifact": "userassist", "type": "userassist_absent", "path": "kape\\C\\Windows\\ServiceProfiles\\NetworkService\\NTUSER.DAT", "locator": "UserAssist", "status": "partial"}], "levelKo": "판정불가"}, {"id": "inf:0089", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19 02:03:43.2637329", "to": "2026-09-19 02:04:19.2094220", "span": 35.946, "rule": "R-INSTALL-ORDER-01", "basis": "설치 단계 디렉터리의 $MFT 생성 시각", "note": "설치 4단계 순서 정상", "alts": [], "arts": ["mft"], "ev": [{"id": "obs:0840", "artifact": "mft", "type": "install_stage", "path": "ProgramData\\Microsoft\\Windows\\AppRepository\\Packages\\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc", "locator": "entry=231818", "status": "ok"}, {"id": "obs:0841", "artifact": "mft", "type": "install_stage", "path": "Program Files\\WindowsApps\\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc", "locator": "entry=231837", "status": "ok"}, {"id": "obs:0842", "artifact": "mft", "type": "install_stage", "path": "Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc", "locator": "entry=236382", "status": "ok"}, {"id": "obs:0844", "artifact": "mft", "type": "install_stage", "path": "Users\\Kwon\\AppData\\Local\\Packages\\Claude_pzs8sxrjxfjjc\\LocalCache\\Roaming\\Claude", "locator": "entry=236466", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0090", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "2026-09-19T02:02:23.039Z", "to": "2026-09-19T02:02:55.398Z", "span": 32.359, "rule": "R-BROWSER-VISIT-01", "basis": "브라우저 방문 기록 12건", "note": "AI 서비스 방문 12건 · 로그인 전 화면 2건", "alts": ["방문은 사람이 눌렀을 수도, 리다이렉트였을 수도 있다"], "arts": ["browser_history"], "ev": [{"id": "obs:0845", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=3041", "status": "ok"}, {"id": "obs:0846", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=3172", "status": "ok"}, {"id": "obs:0847", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=926", "status": "ok"}, {"id": "obs:0848", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=2307", "status": "ok"}, {"id": "obs:0849", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=2255", "status": "ok"}, {"id": "obs:0850", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=2198", "status": "ok"}, {"id": "obs:0851", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=6 offset=3589", "status": "ok"}, {"id": "obs:0853", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=38 offset=3811", "status": "ok"}, {"id": "obs:0854", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=38 offset=3532", "status": "ok"}, {"id": "obs:0855", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=38 offset=2637", "status": "ok"}, {"id": "obs:0856", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=52 offset=1826", "status": "ok"}, {"id": "obs:0857", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=52 offset=1798", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0091", "b": "B01", "name": "사이트 접속 · 설치 및 실행", "q": "Q1", "level": "confirmed", "from": "", "to": "", "span": null, "rule": "R-BROWSER-SEARCH-01", "basis": "브라우저 검색어 (두 출처를 합침)", "note": "검색어 3종", "alts": [], "arts": ["browser_history"], "ev": [{"id": "obs:0852", "artifact": "browser_history", "type": "browser_search", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=12 offset=4075", "status": "ok"}, {"id": "obs:0846", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=3172", "status": "ok"}, {"id": "obs:0847", "artifact": "browser_history", "type": "browser_visit", "path": "kape\\C\\Users\\Kwon\\AppData\\Local\\Microsoft\\Edge\\User Data\\Default\\History", "locator": "page=4 offset=926", "status": "ok"}], "levelKo": "확정"}, {"id": "inf:0092", "b": "B06", "name": "Prompt 입력", "q": "Q3", "level": "confirmed", "from": "2026-09-19T06:40:02.263Z", "to": "2026-09-19T06:50:14.632Z", "span": 612.369, "rule": "R-UUID7-TIME-01", "basis": "메시지 UUIDv7 6개에서 역산한 처음과 마지막", "note": "Python list basics · 메시지 6개", "alts": ["식별자는 메시지 생성 시각이다 — 사용자가 타이핑한 시각과는 조금 다르다"], "arts": ["indexeddb"], "ev": [{"id": "obs:0858", "artifact": "indexeddb", "type": "message_identity", "path": "conversations.json", "locator": "uuid=01a0b864-b2d7-7759-a91c-1310d6aba598", "status": "ok"}, {"id": "obs:0859", "artifact": "indexeddb", "type": "message_identity", "path": "conversations.json", "locator": "uuid=01a0b864-b2d7-7f3d-b8a5-95e133e6f340", "status": "ok"}, {"id": "obs:0860", "artifact": "indexeddb", "type": "message_identity", "path": "conversations.json", "locator": "uuid=01a0b86a-06e6-7cb6-a5a1-0369e76b0921", "status": "ok"}, {"id": "obs:0861", "artifact": "indexeddb", "type": "message_identity", "path": "conversations.json", "locator": "uuid=01a0b86a-06e6-7e67-86c6-70ebec9698e5", "status": "ok"}, {"id": "obs:0862", "artifact": "indexeddb", "type": "message_identity", "path": "conversations.json", "locator": "uuid=01a0b86e-0ae8-7aef-bea1-864c4131a6b2", "status": "ok"}, {"id": "obs:0863", "artifact": "indexeddb", "type": "message_identity", "path": "conversations.json", "locator": "uuid=01a0b86e-0ae8-7e5e-bffb-2e97e40375f9", "status": "ok"}], "levelKo": "확정"}], "root": "C:\\Forensics\\runs\\B01\\T7", "bnames": {"B01": "사이트 접속 · 설치 및 실행", "B02": "로그인 (인증)", "B03": "로그아웃", "B04": "계정 전환", "B05": "새 대화(세션) 생성", "B06": "Prompt 입력", "B07": "Prompt 수정 · 응답 재생성", "B08": "메모리 사용 · 관리", "B09": "파일/이미지 업로드", "B10": "생성물 다운로드 · Export", "B11": "대화/계정 데이터 삭제", "B12": "임시/시크릿 대화 사용", "B13": "외부 서비스 연동 (connector)"}};
+function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,
+function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
+function copy(t,el){
+  var ok=function(){var o=el.textContent;el.textContent='복사됨';
+    setTimeout(function(){el.textContent=o},1200)};
+  try{navigator.clipboard.writeText(t).then(ok,function(){fb(t,ok)})}
+  catch(e){fb(t,ok)}}
+function fb(t,ok){try{var a=document.createElement('textarea');a.value=t;
+  document.body.appendChild(a);a.select();document.execCommand('copy');
+  document.body.removeChild(a);ok()}catch(e){}}
+function panel(html){var p=document.getElementById('panel');
+  document.getElementById('pbody').innerHTML=html;p.classList.add('on')}
+function closeP(){document.getElementById('panel').classList.remove('on')}
+function showPin(id){
+  var p=null;for(var i=0;i<DATA.pins.length;i++){if(DATA.pins[i].id===id){p=DATA.pins[i];break}}
+  if(!p)return;
+  var h='<h2>'+esc(p.name)+'</h2><div class="sub mono">'+esc(p.id)+' · '+esc(p.rule)+'</div>';
+  h+='<div class="kv"><b>등급</b><span>'+esc(p.levelKo)+'</span>';
+  h+='<b>시각</b><span class="mono">'+esc(p.from||'—');
+  if(p.to&&p.to!==p.from)h+=' ~ '+esc(p.to);
+  if(p.span)h+=' ('+esc(p.span)+'초)';
+  h+='</span><b>근거</b><span>'+esc(p.basis||'—')+'</span></div>';
+  if(p.note)h+='<p>'+esc(p.note)+'</p>';
+  (p.alts||[]).forEach(function(a){h+='<div class="alt">배제 못 한 설명 — '+esc(a)+'</div>'});
+  h+='<div class="note"><b>아티팩트 '+p.ev.length+'건</b> — 내용은 싣지 않는다. 경로에서 직접 확인한다.</div>';
+  p.ev.forEach(function(e){
+    h+='<div class="path"><div><span class="tag">'+esc(e.artifact)+'</span>';
+    h+='<span class="tag">'+esc(e.type)+'</span>';
+    if(e.status&&e.status!=='ok')h+='<span class="tag">'+esc(e.status)+'</span>';
+    h+='</div><div style="margin-top:6px">'+esc(e.path||'—')+'</div>';
+    if(e.locator)h+='<div style="color:var(--dim);margin-top:3px">'+esc(e.locator)+'</div>';
+    var full=(DATA.root?DATA.root+'\\':'')+(e.path||'');
+    h+='<button class="btn" onclick="copy('+JSON.stringify(full).replace(/"/g,'&quot;')+',this)">경로 복사</button>';
+    h+='<a class="btn" href="file:///'+esc(full.replace(/\\/g,'/'))+'" target="_blank">열기</a>';
+    h+='<span class="tag mono">'+esc(e.id)+'</span></div>'});
+  panel(h)}
+function showBox(b){
+  var ps=DATA.pins.filter(function(p){return p.b===b});
+  if(!ps.length)return;
+  var lv={},ar={},ts=[];
+  ps.forEach(function(p){lv[p.levelKo]=(lv[p.levelKo]||0)+1;
+    (p.arts||[]).forEach(function(a){ar[a]=(ar[a]||0)+1});
+    if(p.from)ts.push(p.from)});
+  ts.sort();
+  var h='<h2>'+esc(b)+' '+esc((DATA.bnames||{})[b]||ps[0].name)+'</h2>';
+  h+='<div class="sub">근거 '+ps.length+'건</div>';
+  h+='<div class="kv"><b>등급</b><span>'+Object.keys(lv).map(function(k){
+    return esc(k)+' '+lv[k]}).join(' · ')+'</span>';
+  h+='<b>구간</b><span class="mono">'+(ts.length?esc(ts[0])+' ~ '+esc(ts[ts.length-1]):'—')+'</span>';
+  h+='<b>아티팩트</b><span>'+Object.keys(ar).map(function(k){
+    return esc(k)+'×'+ar[k]}).join(', ')+'</span></div>';
+  var n=Object.keys(ar).length;
+  h+='<p>서로 다른 아티팩트 '+n+'종이 같은 행위를 가리킨다.'+
+     (n>1?' 한 출처가 틀려도 나머지가 남는다.':' 출처가 하나뿐이라 교차검증이 안 된다.')+'</p>';
+  h+='<div class="note">핀을 누르면 근거 하나하나의 경로가 나온다.</div>';
+  panel(h)}
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeP()});
+</script>
+</body></html>

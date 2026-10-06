@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 사건 데이터
+*.E01
+*.tgz
+수집물/
+runs/
+out/
