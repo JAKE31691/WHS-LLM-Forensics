@@ -1,0 +1,4 @@
+chatgpt_app/collected_artifacts.zip filter=lfs diff=lfs merge=lfs -text
+chatgpt_app/parsed_artifacts.json filter=lfs diff=lfs merge=lfs -text
+chatgpt_app/LLM_Artifact_Report.csv filter=lfs diff=lfs merge=lfs -text
+chatgpt_app/LLM_Artifact_Report.html filter=lfs diff=lfs merge=lfs -text
