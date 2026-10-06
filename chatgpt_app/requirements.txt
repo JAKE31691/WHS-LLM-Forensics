@@ -1,0 +1,8 @@
+# E01 reader dependencies. Install with a supported 64-bit Python (3.12).
+libewf-python>=20240506
+pytsk3>=20240506
+python-registry>=1.3
+libscca-python>=20260527
+mft>=0.7.0
+# CCL is distributed from its upstream Git tag, not the package registry.
+ccl_chromium_reader @ git+https://github.com/cclgroupltd/ccl_chromium_reader.git@0.3.18

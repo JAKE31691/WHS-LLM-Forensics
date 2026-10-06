@@ -1,0 +1,33 @@
+# Local Python environment and generated files
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.pytest-tmp/
+*.partial
+
+# Local research and validation material (keep locally, omit from GitHub)
+tests/
+행위별 아티팩트 분석 보고서/
+AGENTS.md
+requirements-test.txt
+/python
+/github_upload/
+*.docx
+
+# Evidence and analysis output
+*.E01
+*.E[0-9][0-9]
+*.e01
+*.e[0-9][0-9]
+collected_artifacts.zip
+parsed_artifacts.json
+LLM_Artifact_Report.csv
+LLM_Artifact_Report.html
+auth.json
+*.db
+*.sqlite
+*.sqlite-*
+*.log
+*.pf
+*.hve
