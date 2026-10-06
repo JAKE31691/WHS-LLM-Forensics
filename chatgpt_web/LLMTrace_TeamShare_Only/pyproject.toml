@@ -1,0 +1,8 @@
+[project]
+name = "llmtrace-team-share-only"
+version = "1.0.0"
+description = "LLM forensic analyzer that publishes only team-share CSV and HTML"
+requires-python = ">=3.10"
+
+[project.scripts]
+llmtrace = "llmtrace.environment_cli:main"
