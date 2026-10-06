@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Claude Web (Chrome)</title>
+<style>
+:root { color-scheme: light; --ink: #172033; --muted: #64748b; --line: #dbe3ef; --panel: #fff; --accent: #3157d5; }
+* { box-sizing: border-box; }
+body { max-width: 1440px; margin: 0 auto; padding: 32px; font: 14px/1.5 Inter, "Segoe UI", Arial, sans-serif; color: var(--ink); background: #f5f7fb; }
+h1 { margin: 8px 0 26px; font-size: 30px; line-height: 1.25; }
+main { display: grid; gap: 16px; }
+details { min-width: 0; overflow: hidden; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: 0 3px 14px #1e293b0a; }
+summary { display: flex; align-items: center; gap: 12px; padding: 18px 22px; cursor: pointer; font-size: 17px; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: "\203A"; display: inline-block; color: var(--accent); font-size: 25px; font-weight: 400; line-height: .7; transition: transform .15s ease; }
+details[open] summary { border-bottom: 1px solid var(--line); }
+details[open] summary::before { transform: rotate(90deg); }
+details > p { margin: 0; padding: 20px 22px; color: var(--muted); }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+th, td { padding: 11px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+th { background: #f8fafc; color: var(--muted); font-weight: 600; }
+td { overflow-wrap: anywhere; }
+td:first-child { font-weight: 600; }
+td:nth-child(2) { font-family: Consolas, "Courier New", monospace; font-size: 12px; }
+td:last-child { white-space: nowrap; font-weight: 600; }
+tbody tr:last-child td { border-bottom: 0; }
+</style>
+</head>
+<body>
+<h1>Claude Web (Chrome)</h1>
+<main>
+<details>
+<summary>사이트 접속</summary>
+<div class="table-wrap"><table>
+<thead><tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr></thead>
+<tbody>
+<tr><td>History (https://claude.ai/)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\History</td><td>직접</td></tr>
+<tr><td>Cookies (anthropic-device-id)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies</td><td>보조</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>로그인</summary>
+<div class="table-wrap"><table>
+<thead><tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr></thead>
+<tbody>
+<tr><td>Cookies (sessionKey)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies</td><td>직접</td></tr>
+<tr><td>Cookies (lastActiveOrg)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies</td><td>보조</td></tr>
+<tr><td>History (claude.ai/new)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\History</td><td>보조</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>로그아웃</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>다른 계정으로 재로그인</summary>
+<p>미지원 (사유: rules_support.md)</p>
+</details>
+<details>
+<summary>새 대화에서 프롬프트 전송</summary>
+<div class="table-wrap"><table>
+<thead><tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr></thead>
+<tbody>
+<tr><td>History (claude.ai/chat/)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\History</td><td>보조</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>기존 대화에서 프롬프트 전송</summary>
+<p>미지원 (사유: rules_support.md)</p>
+</details>
+<details>
+<summary>프롬프트 수정하여 답변 재생성</summary>
+<div class="table-wrap"><table>
+<thead><tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr></thead>
+<tbody>
+<tr><td>Local Storage (claudeai.message.edit_started)</td><td>C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Local Storage\leveldb\000004.log</td><td>보조</td></tr>
+</tbody>
+</table></div>
+</details>
+<details>
+<summary>메모리 기능 사용</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>파일 업로드</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>파일 다운로드</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>개별 대화 삭제</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>incognito chat 사용</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>커넥터 연결</summary>
+<p>해당 아티팩트 없음</p>
+</details>
+<details>
+<summary>비고</summary>
+<p>입력 종류: Folder (Default)<br>입력: C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default<br>검출 = 흔적 발견(행위 확정 아님). 해당 아티팩트 없음 = 흔적 없음(행위 안 함 아님).</p>
+</details>
+</main>
+</body>
+</html>

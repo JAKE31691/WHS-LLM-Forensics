@@ -1,0 +1,8 @@
+﻿행위 분류,아티팩트,경로,아티팩트 등급
+사이트 접속,History (https://claude.ai/),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\History,직접
+사이트 접속,Cookies (anthropic-device-id),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies,보조
+로그인,Cookies (sessionKey),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies,직접
+로그인,Cookies (lastActiveOrg),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Network\Cookies,보조
+로그인,History (claude.ai/new),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\History,보조
+새 대화에서 프롬프트 전송,History (claude.ai/chat/),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\History,보조
+프롬프트 수정하여 답변 재생성,Local Storage (claudeai.message.edit_started),C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default\Local Storage\leveldb\000004.log,보조
