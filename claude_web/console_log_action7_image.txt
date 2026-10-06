@@ -1,4 +1,4 @@
-C:\Users\choonsik\Desktop>py main5.py "C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default" ./result_test
+C:\Users\choonsik\Desktop>py main.py "C:\Users\choonsik\Desktop\Forensics\Validation\A07\whs4user\AppData\Local\Google\Chrome\User Data\Default" ./result_test
 LLM Artifact Analyzer v1.3.0
 Author: jbsquad
 Contact: jbsquad000@gmail.com
