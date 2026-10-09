@@ -1,6 +1,0 @@
-ccl_chromium_reader ef840de30221c4d65bc96d2f4d9057e9ef2f526d (2026-08-06)
-ccl_simplesnappy 3d085230baa8c46cf2090ebba29bf6e8eab31087 (2024-07-30)
-
-수정 사항 (원본과 다른 곳)
-- ccl_chromium_reader/__init__.py: ChromiumProfileFolder import를 try/except로 감쌈
-  (brotli, zstd 패키지가 없어도 하위 모듈을 쓸 수 있게 하기 위함)
