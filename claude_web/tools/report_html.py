@@ -4,10 +4,10 @@
 - 행위별 매칭 결과: 검색창, 모두 펼치기·접기 버튼, 행위 토글(A01~A14) 안에 시각별 토글, 그 안에 표
   표 열: 시각 / 아티팩트 / 경로 / 등급 / 근거 (CSV와 같은 값)
 - 처음에는 모두 접혀 있다. 파일 하나로 끝나고 외부 파일을 불러오지 않는다.
-- 매칭이 0건인 행위는 팀 표준에 맞춰 '해당 아티팩트 없음'만 쓴다 (규칙 없음·경로 없음·읽기 실패·매칭 없음 구분 없이).
-  이유별 상태는 콘솔 출력(main.py)에 그대로 남는다.
-- 매칭이 있는 행위는 표 아래에, 행을 만들지 못한 아티팩트의 상태를 적는다:
-  Inconclusive (Path not found) / Inconclusive (Path exists but unreadable) / not detected
+- 팀 예시와 같게, 매칭이 0건인 행위는 '해당 아티팩트 없음'만 쓰고 매칭이 있는 행위는 표만 쓴다
+  (규칙 없음·경로 없음·읽기 실패·매칭 없음 구분 없이). 이유별 상태는 콘솔 출력(main.py)에 그대로 남는다.
+- SHOW_STATE_DETAIL = True로 바꾸면 행을 만들지 못한 아티팩트의 상태를 행위마다 적는다:
+  Inconclusive (No rules defined) / Inconclusive (Path not found) / Inconclusive (Path exists but unreadable) / not detected
 - 근거에 프롬프트 원문이 들어갈 수 있으므로 모든 값을 이스케이프한다.
 
 CSS와 검색·펼치기 스크립트는 예시 report.py의 REPORT_CSS, REPORT_JS를 그대로 가져왔다.
@@ -106,6 +106,10 @@ STATE_LABELS = (
 # 팀 표준: 매칭이 0건인 행위는 이유와 상관없이 이 문구 하나만 쓴다
 NO_MATCH_TEXT = "해당 아티팩트 없음"
 
+# False(기본): 팀 예시 형식 — 0건이면 NO_MATCH_TEXT, 매칭이 있으면 표만
+# True       : 행을 만들지 못한 아티팩트의 상태(STATE_LABELS)를 모든 행위에 적는다
+SHOW_STATE_DETAIL = False
+
 
 def _e(s):
     return escape("" if s is None else str(s), quote=True)
@@ -177,11 +181,11 @@ def write_html(rows, status, info, path):
             for r in grows:
                 out.append("<tr>%s</tr>\n" % _cells(r))
             out.append("</tbody>\n</table></div>\n</details>\n")
-        if not arows:
-            out.append('<p class="empty">%s</p>\n' % _e(NO_MATCH_TEXT))
-        else:                                   # 매칭이 있는 행위는 행을 못 만든 아티팩트의 상태를 표 아래에 적는다
+        if SHOW_STATE_DETAIL:
             for line in _state_lines(st):
                 out.append('<p class="empty">%s</p>\n' % _e(line))
+        elif not arows:
+            out.append('<p class="empty">%s</p>\n' % _e(NO_MATCH_TEXT))
         out.append("</div>\n</details>\n")
 
     out.append("</section>\n</main>\n<script>\n" + REPORT_JS + "</script>\n</body>\n</html>\n")
