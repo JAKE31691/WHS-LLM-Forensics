@@ -1,0 +1,21 @@
+﻿rule_id,action_id,artifact,filter,field,op,value,time_field,grade,note
+R-A01-01,A01,History,table=urls;url@=claude.ai,url,contains,https://claude.ai/,last_visit_time,직접,v1.2.0 History 'https://claude.ai/'
+R-A01-02,A01,Cookies,table=cookies;host_key@=claude.ai,name,equals,anthropic-device-id,creation_utc,보조,v1.2.0 Cookies 'anthropic-device-id'
+R-A02-01,A02,Cookies,table=cookies;host_key@=claude.ai,name,equals,sessionKey,creation_utc,직접,v1.2.0 Cookies 'sessionKey' (로그아웃하면 삭제됨)
+R-A02-02,A02,Cookies,table=cookies;host_key@=claude.ai,name,equals,lastActiveOrg,creation_utc,보조,v1.2.0 Cookies 'lastActiveOrg'
+R-A02-03,A02,History,table=urls;url@=claude.ai,url,contains,https://claude.ai/new,last_visit_time,보조,v1.2.0 History 'https://claude.ai/new'
+R-A02-04,A02,Local Storage,storage_key=https://claude.ai,script_key,equals,lastLoginMethod,,보조,v1.2.0 Local Storage 'lastLoginMethod'
+R-A03-01,A03,History,table=urls;url@=claude.ai,url,contains,claude.ai/logout,last_visit_time,직접,v1.2.0 History 'claude.ai/logout'
+R-A03-02,A03,Local Storage,storage_key=https://claude.ai,script_key,contains,-logout-at,value,보조,v1.2.0 Local Storage '-logout-at'
+R-A05-01,A05,History,table=urls;url@=claude.ai,url,contains,https://claude.ai/chat/,last_visit_time,보조,v1.2.0 History 'https://claude.ai/chat/' (기존 대화를 열어도 남음)
+R-A05-02,A05,Local Storage,storage_key=https://claude.ai,script_key,contains,claude-conversation-ledger,,보조,v1.2.0 Local Storage 'claude-conversation-ledger'
+R-A05-03,A05,IndexedDB,,**.parent_message_uuid,equals,00000000-0000-4000-8000-000000000000,created_at,보조,v1.2.0 IndexedDB 첫 메시지의 parent UUID
+R-A07-01,A07,Local Storage,storage_key=https://claude.ai;script_key=antalytics_queue_v1,value_json[*].eventName,equals,claudeai.message.edit_started,eventTimestamp,보조,v1.2.0 Local Storage 'claudeai.message.edit_started' (분석 이벤트 큐)
+R-A08-01,A08,IndexedDB,,**.name,equals,memory_write,start_timestamp|created_at,직접,v1.2.0 IndexedDB 'memory_write' (대화 안 tool_use 이름)
+R-A09-01,A09,IndexedDB,,**.file_kind,equals,document,created_at,직접,v1.2.0 IndexedDB file_kind=document
+R-A10-01,A10,History,,,custom,downloads_from_claude,start_time,직접,v1.2.0 History downloads (claude.ai 탭/리퍼러 또는 wiggle/download-file)
+R-A11-01,A11,IndexedDB,,value.tombstone,equals,true,deletedAt,직접,v1.2.0 IndexedDB 'tombstone' (삭제된 대화 표시)
+R-A13-01,A13,History,table=urls;url@=claude.ai,url,contains,claude.ai/new?incognito,last_visit_time,직접,v1.2.0 History 'claude.ai/new?incognito'
+R-A14-01,A14,History,table=urls;url@=claude.ai,url,contains,claude.ai/api/mcp/auth_callback,last_visit_time,직접,v1.2.0 History 'claude.ai/api/mcp/auth_callback'
+R-A14-02,A14,History,table=urls;url@=claude.ai,url,contains,claude.ai/customize/connectors,last_visit_time,보조,v1.2.0 History 'claude.ai/customize/connectors'
+R-A14-03,A14,History,table=urls,url,contains,gmailmcp,last_visit_time,보조,v1.2.0 History 'gmailmcp'
