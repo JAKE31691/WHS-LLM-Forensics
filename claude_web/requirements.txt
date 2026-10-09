@@ -1,0 +1,11 @@
+# 설치: py -m pip install -r requirements.txt
+# live 입력만 쓸 거면 아래 패키지가 없어도 돈다 (Python 3.10 이상, 표준 라이브러리 + 동봉한 third_party).
+
+# E01 입력에만 필요.
+# Python 3.14에서는 정식판 3.25.1이 import되지 않아(glob 내부 함수 변경) 3.14를 지원하는 개발판을 고정한다.
+dissect.target==3.25.1 ; python_version < "3.14"
+dissect.target==3.25.2.dev83 ; python_version >= "3.14"
+
+# Cache 본문 해제에만 필요. 없으면 그 본문만 "해제할 수 없는 인코딩"으로 남고 나머지는 그대로 돈다.
+Brotli>=1.1
+zstandard ; python_version < "3.14"
