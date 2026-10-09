@@ -2,6 +2,7 @@
 libewf-python>=20240506
 pytsk3>=20240506
 python-registry>=1.3
+libfwsi-python>=20260522
 libscca-python>=20260527
 mft>=0.7.0
 # CCL is distributed from its upstream Git tag, not the package registry.

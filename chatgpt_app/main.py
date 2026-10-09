@@ -13,7 +13,9 @@ import zipfile
 from pathlib import Path
 
 from artifact_definitions import ARTIFACT_DEFINITIONS, validate_definitions
-from action_rules import detect_confirmed_observations, link_confirmed_observations, rows_without_conditions
+from action_rules import (ACTION_TAXONOMY, NOTES_BEHAVIOR, detect_confirmed_observations,
+                          link_confirmed_observations, rows_without_conditions,
+                          rows_for_missing_logout)
 from collect import CollectionSetupError, CollectionSummary, E01Reader, LiveReader, collect_artifacts
 from parsers import parse_artifacts
 from report import prepare_report_rows, write_csv_report, write_html_report
@@ -154,25 +156,35 @@ def print_parsing_diagnostics(parsed: dict) -> None:
 
 
 def print_action_summary(rows: tuple[dict[str, str], ...]) -> tuple[int, int, int]:
-    """Count distinct artifact names per behavior and grade, not file rows."""
+    """Count distinct artifact definitions per behavior and grade."""
     print("Analyzing user actions...")
     by_behavior: dict[str, dict[str, set[str]]] = {}
     for row in rows:
-        by_behavior.setdefault(row["행위 분류"], {"직접": set(), "보조": set()})[
-            row["아티팩트 등급"]].add(row["아티팩트"])
-    for index, (behavior, grades) in enumerate(by_behavior.items(), start=1):
-        print(f"  [{index}] {behavior}")
+        by_behavior.setdefault(row["사용자 행위"], {"직접": set(), "보조": set()})[
+            row["등급"]].add(getattr(row, "rule_id", None) or row["아티팩트"])
+    for action_id, behavior in ACTION_TAXONOMY:
+        if behavior not in by_behavior:
+            continue
+        grades = by_behavior[behavior]
+        print(f"  [{action_id}] {behavior}")
         print(f"      Direct evidence     : {len(grades['직접'])}")
         print(f"      Supporting evidence: {len(grades['보조'])}")
-    direct = sum(len(grades["직접"]) for grades in by_behavior.values())
-    supporting = sum(len(grades["보조"]) for grades in by_behavior.values())
+    if NOTES_BEHAVIOR in by_behavior:
+        grades = by_behavior[NOTES_BEHAVIOR]
+        print(f"  [비고] {NOTES_BEHAVIOR}")
+        print(f"      Direct evidence     : {len(grades['직접'])}")
+        print(f"      Supporting evidence: {len(grades['보조'])}")
+    action_names = {name for _, name in ACTION_TAXONOMY}
+    direct = sum(len(grades["직접"]) for name, grades in by_behavior.items() if name in action_names)
+    supporting = sum(len(grades["보조"]) for name, grades in by_behavior.items() if name in action_names)
+    actions_detected = sum(name in by_behavior for name in action_names)
     print()
     print("User action analysis completed.")
-    print(f"  Actions detected   : {len(by_behavior)}")
+    print(f"  Actions detected   : {actions_detected}")
     print(f"  Direct evidence    : {direct}")
     print(f"  Supporting evidence: {supporting}")
     print()
-    return len(by_behavior), direct, supporting
+    return actions_detected, direct, supporting
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -220,11 +232,13 @@ def main(argv: list[str] | None = None) -> int:
         if summary.archive_path and summary.archive_path.is_file():
             with zipfile.ZipFile(summary.archive_path) as archive:
                 manifest = json.loads(archive.read("_collection_manifest.json"))
-        report_rows = prepare_report_rows((*analysis.rows, *rows_without_conditions(manifest)))
+        report_rows = prepare_report_rows((*analysis.rows, *rows_without_conditions(
+            manifest, confirmed_rows=analysis.rows, parsed_artifacts=parsed),
+                                           *rows_for_missing_logout(manifest)))
     except (OSError, ValueError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
         print(f"User action analysis error: {exc}", file=sys.stderr)
         return 1
-    actions_detected, _, _ = print_action_summary(report_rows)
+    actions_detected, direct_evidence_count, supporting_evidence_count = print_action_summary(report_rows)
     try:
         csv_path = output / "LLM_Artifact_Report.csv"
         row_count = write_csv_report(csv_path, report_rows)
@@ -237,7 +251,12 @@ def main(argv: list[str] | None = None) -> int:
     print()
     try:
         html_path = output / "LLM_Artifact_Report.html"
-        html_count = write_html_report(html_path, report_rows)
+        html_count = write_html_report(
+            html_path, report_rows, source_type=source_type,
+            actions_detected=actions_detected,
+            direct_evidence_count=direct_evidence_count,
+            supporting_evidence_count=supporting_evidence_count,
+        )
         if html_count != row_count:
             raise ValueError("CSV and HTML row counts differ")
     except (OSError, ValueError) as exc:

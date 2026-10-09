@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PureWindowsPath
 from typing import Any, Iterator, Sequence
 
-from artifact_definitions import ArtifactDefinition, expand_path_pattern
+from artifact_definitions import ArtifactDefinition, CollectionTarget
 
 
 CHUNK_SIZE = 1024 * 1024
@@ -757,26 +757,33 @@ def collect_artifacts(
 
     summary = CollectionSummary(archive_path=archive_path)
     definitions_by_id = {definition.id: definition for definition in definitions}
-    candidates: dict[str, tuple[Candidate, set[str]]] = {}
-    pattern_owners: dict[str, tuple[str, set[str]]] = {}
+    candidates: dict[str, tuple[Candidate, set[str], set[str]]] = {}
+    target_owners: dict[tuple[str, str, bool], tuple[CollectionTarget, set[str], set[str]]] = {}
     matched_by_definition: dict[str, set[str]] = {item.id: set() for item in definitions}
     for definition in definitions:
-        for template in definition.expected_paths:
-            patterns = expand_path_pattern(template, reader.user_profiles, reader.system_drive)
-            for pattern in patterns:
-                key = pattern.casefold()
-                if key in pattern_owners:
-                    pattern_owners[key][1].add(definition.id)
-                else:
-                    pattern_owners[key] = (pattern, {definition.id})
+        for targets, companion in (
+            (definition.collection_targets(reader.user_profiles, reader.system_drive), False),
+            (definition.companion_targets(reader.user_profiles, reader.system_drive), True),
+        ):
+            for target in targets:
+                key = (target.path.casefold(), target.file_mask.casefold(), target.recursive)
+                if key not in target_owners:
+                    target_owners[key] = (target, set(), set())
+                target_owners[key][2 if companion else 1].add(definition.id)
 
-    for pattern, owners in pattern_owners.values():
+    for target, primary_owners, companion_owners in target_owners.values():
+        owners = primary_owners | companion_owners
+        pattern = target.search_pattern
         try:
             found_here = list(reader.find(pattern))
         except (OSError, IOError, ValueError) as exc:
             summary.warnings.append(f"cannot search {pattern}: {exc}")
             continue
         for candidate in found_here:
+            if target.recursive and not fnmatch.fnmatchcase(
+                PureWindowsPath(candidate.original_path).name.casefold(), target.file_mask.casefold()
+            ):
+                continue
             prefetch_owners = {
                 item_id for item_id in owners
                 if definitions_by_id[item_id].prefetch_executable
@@ -799,12 +806,15 @@ def collect_artifacts(
             if not selected_owners:
                 continue
             key = _candidate_key(candidate)
-            for definition_id in selected_owners:
+            selected_primary = selected_owners & primary_owners
+            selected_companion = selected_owners & companion_owners
+            for definition_id in selected_primary:
                 matched_by_definition[definition_id].add(key)
             if key in candidates:
-                candidates[key][1].update(selected_owners)
+                candidates[key][1].update(selected_primary)
+                candidates[key][2].update(selected_companion)
             else:
-                candidates[key] = (candidate, selected_owners)
+                candidates[key] = (candidate, selected_primary, selected_companion)
 
     warned_definitions: set[tuple[tuple[str, ...], str | None]] = set()
     for definition in definitions:
@@ -820,11 +830,12 @@ def collect_artifacts(
             warned_definitions.add(warning_key)
 
     summary.found = len(candidates)
-    for _, definition_ids in candidates.values():
+    for _, definition_ids, companion_ids in candidates.values():
         # The archive stores each physical file once. Display it under every
         # artifact label whose definition matched the file (for example, one
         # NTUSER.DAT contains UserAssist and both ComDlg32 MRU keys).
-        for artifact in {definitions_by_id[item_id].artifact for item_id in definition_ids}:
+        for artifact in {definitions_by_id[item_id].artifact
+                         for item_id in definition_ids | companion_ids}:
             summary.per_artifact[artifact] = summary.per_artifact.get(artifact, 0) + 1
     summary.warnings.extend(reader.warnings)
     output.mkdir(parents=True, exist_ok=True)
@@ -847,11 +858,14 @@ def collect_artifacts(
     staged_archive = archive_path.with_name(archive_path.name + ".partial")
     try:
         with zipfile.ZipFile(staged_archive, "w", compression=zipfile.ZIP_DEFLATED, allowZip64=True) as archive:
-            for candidate, definition_ids in candidates.values():
+            for candidate, definition_ids, companion_ids in candidates.values():
                 record: dict[str, Any] = {
                     "source_path": candidate.original_path,
                     "collected_path": None,
                     "definition_ids": sorted(definition_ids),
+                    "collection_role": "primary" if definition_ids else "companion",
+                    "companion_for": sorted(companion_ids),
+                    "artifact_name": ("Registry transaction log" if companion_ids and not definition_ids else None),
                     "status": "failed",
                     "status_before": "not_checked",
                     "status_after": "not_checked",
