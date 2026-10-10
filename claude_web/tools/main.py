@@ -313,7 +313,7 @@ def execute(source, out_dir, command_line, rules_path=RULES_PATH, verify_hash=Fa
         info = {"source_type": source.kind, "actions_detected": detected,
                 "direct": n_direct, "support": n_support}
         try:
-            write_html(rows, status, info, html_path)
+            write_html(rows, status, info, html_path, rules)
             _status_line(True)
         except Exception as e:
             _status_line(False, "%s: %s" % (type(e).__name__, e))
