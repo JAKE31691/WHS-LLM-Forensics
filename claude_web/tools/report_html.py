@@ -5,16 +5,14 @@
   검색창과 모두 펼치기·접기, 행위(A01~A14) 토글 → 시각별 토글 → 표(시각 / 아티팩트 / 경로 / 등급 / 근거)
 - 근거 칸: 규칙의 아티팩트 이름 배지(History, Cookies ...) → 읽기 쉬운 줄(대표로 맞은 '필드 = 값', 시각)
   → '원본 근거 보기'를 누르면 CSV 근거 열과 같은 원문
-- 매칭이 0건인 행위는 PM 예시처럼 '해당 아티팩트 없음'을 쓰고, 뒤에 세부 상태만 붙인다
-  (어떤 아티팩트인지는 쓰지 않는다. 수집한 아티팩트는 ZIP에, 규칙은 판정 규칙 탭에 있다):
-    해당 아티팩트 없음 (경로 없음)
-    해당 아티팩트 없음 (있지만 읽기 실패)
-    해당 아티팩트 없음 (읽었지만 매칭 없음)
-    해당 아티팩트 없음 (판정 규칙 없음)        <- 규칙이 없는 행위(A04, A06, A12)
-  한 행위에 상태가 여럿이면 상태마다 한 줄씩 쓴다.
-  매칭이 있는 행위도 못 읽은 아티팩트가 있으면 '일부 아티팩트를 읽지 못함 (있지만 읽기 실패)'를 적는다
-  (매칭 건수가 덜 나왔을 수 있으므로).
-  SHOW_STATE_DETAIL = False로 바꾸면 PM 예시와 똑같이 '해당 아티팩트 없음'만 쓴다.
+- 매칭이 0건인 행위는 PM 예시와 똑같이 '해당 아티팩트 없음'만 쓴다.
+  수집한 아티팩트는 ZIP에, 규칙은 판정 규칙 탭에, 행위별·아티팩트별 상태는 콘솔 출력에 있다.
+  SHOW_STATE_DETAIL = True로 바꾸면 세부 상태와 아티팩트를 붙인다:
+    해당 아티팩트 없음 (경로 없음): Local Storage (user\\Default)
+    해당 아티팩트 없음 (있지만 읽기 실패): ...
+    해당 아티팩트 없음 (읽었지만 매칭 없음): ...
+    해당 아티팩트 없음 (판정 규칙 없음)                       <- 규칙이 없는 행위(A04, A06, A12)
+  이때는 매칭이 있는 행위도 못 읽은 아티팩트가 있으면 따로 적는다 (매칭 건수가 덜 나왔을 수 있으므로).
 - 판정 규칙 탭: rules.csv의 규칙 표 (규칙 ID / 행위 / 아티팩트 / 필터 / 시각 필드 / 비고)
 - 처음에는 모두 접혀 있다. 파일 하나로 끝나고 외부 파일을 불러오지 않는다.
 - 근거에 프롬프트 원문이 들어갈 수 있으므로 모든 값을 이스케이프한다.
@@ -160,7 +158,7 @@ RULE_COLUMNS = ("규칙 ID", "행위", "아티팩트", "필터", "시각 필드"
 MAX_VALUE_CHARS = 300
 
 NO_MATCH_TEXT = "해당 아티팩트 없음"      # PM 예시의 0건 문구
-SHOW_STATE_DETAIL = True                   # False: PM 예시와 똑같이 NO_MATCH_TEXT만 쓴다
+SHOW_STATE_DETAIL = False                  # True: 뒤에 세부 상태와 아티팩트를 붙인다 (위 설명 참고)
 
 # 행이 없는 아티팩트의 세부 상태 (출력 순서대로)
 STATE_LABELS = (
@@ -200,8 +198,9 @@ def _state_lines(st):
     a = st["artifacts"]
     if st["state"] == "detected":
         failed = a.get("read_failed") or []
-        return ["일부 아티팩트를 읽지 못함 (있지만 읽기 실패)"] if failed else []
-    return ["%s (%s)" % (NO_MATCH_TEXT, label) for key, label in STATE_LABELS if a.get(key)]
+        return ["일부 아티팩트를 읽지 못함 (있지만 읽기 실패): %s" % ", ".join(failed)] if failed else []
+    return ["%s (%s): %s" % (NO_MATCH_TEXT, label, ", ".join(a[key]))
+            for key, label in STATE_LABELS if a.get(key)]
 
 
 def _evidence_cell(r):
