@@ -28,7 +28,7 @@ Live 수집은 관리자 권한의 Windows 터미널에서 실행합니다. 프�
 | --- | --- |
 | `collected_artifacts.zip` | 수집본과 `_collection_manifest.json`. 원본 경로 `C:\Users\...`는 ZIP 안에서 `C/Users/...`로 보존됩니다. |
 | `parsed_artifacts.json` | 파서별 기록, 수집·파싱 상태, 원본·수집 경로. 인증 토큰과 쿠키 값은 표시하지 않으며 일부 파서는 출력 기록 수를 제한합니다. 원본 바이트는 ZIP에 남습니다. |
-| `LLM_Artifact_Report.csv` | `시각`, `사용자 행위`, `아티팩트`, `경로`, `등급`, `근거` 여섯 열의 UTF-8 BOM 보고서. 시각은 확인된 행위 시각의 KST 값이며 근거는 파싱 기록의 위치와 매칭값이다. |
+| `LLM_Artifact_Report.csv` | `시각`, `사용자 행위`, `아티팩트`, `경로`, `등급`, `근거` 여섯 열의 UTF-8 BOM 보고서. 시각은 확인된 행위 시각의 KST 값이며, 근거는 파싱 기록의 위치와 매칭값이다. |
 | `LLM_Artifact_Report.html` | CSV와 동일한 행을 행위별 아코디언으로 표시하는 독립 실행형 보고서. |
 
 근거 값 뒤에는 확인 가능한 원본 위치를 표시합니다. JSON은 1부터 시작하는 줄·문자 열 번호, JSONL과 로그는 원본 줄 번호, 캐시 원시 문자열은 0부터 시작하는 파일 바이트 오프셋(10진수·16진수)과 매칭 길이를 기록합니다. 복합 문자열 조건은 각 구성 문자열의 첫 매칭 위치를 표시합니다. SQLite의 테이블·컬럼과 레지스트리의 키·값 이름은 논리 위치로 구분하며, 파서가 물리 위치를 제공하지 않으면 `확인 불가`로 표시합니다. 압축 캐시에서 복원한 응답의 위치를 원본 파일 오프셋으로 추정하지 않습니다.
@@ -87,7 +87,7 @@ artifacts[0].records[0].rows[33].url="https://chatgpt.com/"; artifacts[0].source
 - LevelDB의 `file=…;offset=…`: 파서가 제공한 위치이며 물리 바이트 기준 확인 여부는 `basis`에 표시.
 - Registry의 `key=…;value=…`: 레지스트리 키·값의 논리 위치.
 
-알 수 없는 위치에는 `record` 번호나 바이트 오프셋을 생성하지 않는다. 저장할 위치가 없으면 `source_location`은 빈 배열이다. 기존 `source_locations` 필드는 호환용으로 유지하며, 이전 JSON에 대한 보고서 처리도 지원한다. CSV는 기존 여섯 열을 유지한다.
+알 수 없는 위치에는 `record` 번호나 바이트 오프셋을 생성하지 않는다. 저장할 위치가 없으면 `source_location`은 빈 배열이다. 기존 `source_locations` 필드는 호환용으로 유지하며, 이전 JSON에 대한 보고서 처리도 지원한다. CSV는 여섯 열을 사용하며, HTML의 근거 요약은 같은 행의 근거에서 표시한다.
 
 
 ### UserAssist 해석 필드
@@ -132,7 +132,7 @@ MRU의 원시 REG_BINARY는 기존 value에 남는다. `libfwsi-python`의 `pyfw
 - 임시 채팅은 `title=New Chat` 조건을 유지하고 `conversation_id`, `create_time`이 있으면 근거·시각에 포함한다.
 - 플러그인 History는 `https://chatgpt.com/connector_platform_oauth_redirect?state=codex_scheme__oauth`를 포함한 URL과 `last_visit_time`을 사용한다. 데스크톱 로그는 `plugin_install_succeeded` 행 전체와 그 안의 시간대가 있는 날짜를 사용한다.
 - 플러그인 SQLite는 `log`/`logs`의 `feedback_log_body`, thread_history의 `item_json`에 `@openai-curated-remote)`가 포함된 경우를 사용한다. 시각은 각각 Unix 초 `ts`, Unix 밀리초 `created_at_ms`다. thread_history와 rollout에서는 해당 문자열이 **실제 MCP 도구 호출 기록**에 있을 때만 행위로 연결한다. 사용자·개발자 메시지와 요약에 인용된 문자열은 제외한다. 세 아티팩트의 근거에는 매칭 문자열을 담은 가장 안쪽 키 값과 시각 필드만 적는다. JSON 문자열 안의 키는 `json_key=$.…`로 표시한다.
-- global state의 플러그인 조건은 기존 MCP catalog의 tools와 그 `_meta`, 또는 `openai-curated-remote`을 포함한 상태 문자열이다. `prompt-history`와 `thread-description`의 인용된 텍스트는 플러그인 사용으로 해석하지 않는다. 플러그인 폴더는 `하위 폴더명=[gmail, google-drive, …]` 형태의 단일 근거로 표시하고 `source_location`은 덧붙이지 않는다.
+- global state의 플러그인 조건은 기존 MCP catalog의 tools와 그 `_meta`, 또는 `openai-curated-remote`을 포함한 상태 문자열이다. `prompt-history`와 `thread-description`의 인용된 텍스트는 플러그인 사용으로 해석하지 않는다. 플러그인 폴더는 `하위 폴더명=[gmail, google-drive, …]` 형태의 단일 근거로 표시하고 `source_location`은 덧붙이지 않는다. 이 목록에서 `openai-templates`, `plugin-management`, `sites`, `work-pets`는 제외한다.
 - UserAssist 실행 조건은 디코딩한 `program_name`에 `ChatGPT.exe`가 포함된 값이다. 근거에는 프로그램명·`value_data_offsets`·실행 횟수·`last_executed_kst`를 표시하고, 보고서 시각은 `last_executed_kst`로 계산한다.
 - 같은 CSV 행의 동일한 record 위치와 `source_location`은 한 번만 표시한다. 매칭값과 시각값이 한 원본 줄 또는 SQLite 행에 함께 있어도 원본 위치 참조는 중복하지 않는다.
-- CSV 여섯 열과 HTML의 동일 데이터 사용은 유지한다. 개별 행 분리는 내부 식별값으로 관리하고 열을 추가하지 않는다. CLI evidence 개수는 계속 고유 아티팩트 정의 수다. 비고 여섯 아티팩트의 근거는 사용자가 지정한 설명 문구다.
+- CSV 여섯 열과 HTML의 동일 데이터 사용은 유지한다. 개별 행 분리는 내부 식별값으로 관리한다. HTML 근거 요약은 해당 행의 근거에서 만들며 새 판정 정보를 추가하지 않는다. CLI evidence 개수는 계속 고유 아티팩트 정의 수다. 비고 여섯 아티팩트의 근거는 사용자가 지정한 설명 문구다.

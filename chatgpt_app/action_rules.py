@@ -128,6 +128,9 @@ DIRECTORY_REPORT_MARKERS = {
     "connector_package": r"\plugins\cache\openai-curated-remote",
     "work_memories": r"\.codex\memories",
 }
+EXCLUDED_PLUGIN_FOLDERS = frozenset({
+    "openai-templates", "plugin-management", "sites", "work-pets",
+})
 
 NOTES_EVIDENCE = {
     "work_logs": "실행 과정 중 로그; thread_id, cwd, plugin이나 tool 종류, user prompt 등",
@@ -137,6 +140,80 @@ NOTES_EVIDENCE = {
     "work_thread_history": "rollout에서 추출한 thread history; thread 정보, 대화/ 작업 기록 등",
     "work_memories": "raw memory, memory summary 등 저장된 메모리 기록",
 }
+
+
+REPORT_CONTENT = {
+    "install_prefetch": "ChatGPT 설치 프로그램의 실행 기록 확인",
+    "install_appx": "AppX 패키지 등록 경로와 마지막 기록 시각 확인",
+    "run_prefetch": "ChatGPT.exe 실행 기록 확인",
+    "run_userassist": "ChatGPT.exe GUI 실행 기록과 실행 횟수 확인",
+    "run_global_state": "앱 최초 확인 시각 필드 확인",
+    "run_amcache": "AmCache에서 ChatGPT.exe 이름과 기록 시각 확인",
+    "login_codex_db": "로컬 대화 호스트의 host_id 확인",
+    "switch_codex_db": "서로 다른 host_id로 로컬 계정 구분 확인",
+    "chat_codex_db": "새 대화의 thread_id와 생성 기록 확인",
+    "chat_cache": "대화 응답에서 대화 ID와 제목·생성 시각 필드 확인",
+    "chat_global_state": "대화 프롬프트 기록 또는 대화 연결 정보 확인",
+    "prompt_input_cache": "사용자 메시지 내용과 update_time 확인",
+    "prompt_edit_cache": "create_time과 복수 children ID 기록 확인",
+    "memory_cache": "메모리 참조 또는 사용량 표시 기록 확인",
+    "upload_cache": "메시지의 첨부파일 메타데이터 확인",
+    "upload_open_mru": "파일 선택 기록에서 파일 경로 확인",
+    "upload_visited_mru": "ChatGPT.exe의 파일 선택 대화상자 접근 기록 확인",
+    "download_mft": "파일 시스템 메타데이터 수집 확인",
+    "download_cache": "메시지에 포함된 다운로드 문자열 확인",
+    "download_open_mru": "파일 저장 대화상자 기록에서 파일 경로 확인",
+    "download_visited_mru": "ChatGPT.exe의 파일 저장 대화상자 접근 기록 확인",
+    "account_delete_cache": "계정 삭제 확인에 따른 로그아웃 사유·출처 기록 확인",
+    "temporary_chat_cache": "New Chat 제목의 대화 기록 확인",
+    "connector_history": "플러그인 OAuth 리디렉션 URL 방문 기록 확인",
+    "connector_log": "플러그인 설치 성공 로그 확인",
+    "connector_package": "설치된 플러그인 하위 폴더명 확인",
+    "connector_global_state": "MCP 도구 캐시 또는 플러그인 관련 상태 기록 확인",
+    "connector_work_logs": "도구 호출 로그에서 플러그인 문자열 확인",
+    "connector_rollout": "도구 호출 실행 기록에서 플러그인 문자열 확인",
+    "connector_thread_history": "대화 작업 기록에서 플러그인 문자열 확인",
+    "work_logs": "실행 과정의 로그 파일 수집 확인",
+    "work_session_index": "대화 세션 인덱스 파일 수집 확인",
+    "work_state": "대화·세션 메타데이터 파일 수집 확인",
+    "work_rollout": "대화·작업 실행 기록 파일 수집 확인",
+    "work_thread_history": "대화 작업 이력 파일 수집 확인",
+    "work_memories": "저장된 메모리 파일 수집 확인",
+}
+
+
+def _report_content(rule: ActionRule, evidence: str) -> str:
+    """Summarize only fields that the row already cites; never classify anew."""
+    if rule.definition_id == "logout_auth":
+        return ".codex 프로필에서 auth.json 수집 기록 없음(로그아웃 보조 정황)"
+    if rule.definition_id == "connector_package" and evidence == "하위 폴더명=[]":
+        return "플러그인 캐시 수집 확인(표시 대상 하위 폴더 없음)"
+    if rule.definition_id == "login_auth":
+        has_id = "id_token" in evidence
+        has_access = "access_token" in evidence
+        if has_id and has_access:
+            return "id_token과 access_token의 인증 기록 확인"
+        token = "id_token" if has_id else "access_token"
+        return (f"{token}의 claim과 발급 시각 확인" if "jwt_claims.iat" in evidence
+                else f"{token}의 claim 확인" if "jwt_claims" in evidence
+                else f"{token} 존재 확인")
+    if rule.definition_id == "login_cache":
+        return ("계정 정보 응답에서 사용자 ID와 계정 생성 시각 확인"
+                if "account_user_id" in evidence else "계정 정보 응답에서 생성 시각 확인")
+    if rule.definition_id == "login_history":
+        return ("인증 콜백 URL 방문 기록 확인" if "auth/callback" in evidence
+                else "Codex 앱 열기 URL 방문 기록 확인")
+    if rule.definition_id == "chat_codex_db" and "display_title" in evidence:
+        return "새 대화의 thread_id·제목·생성 기록 확인"
+    if rule.definition_id == "chat_global_state":
+        return ("프롬프트 기록 확인" if "prompt_history" in evidence
+                else "대화 연결 정보 확인")
+    if rule.definition_id == "temporary_chat_cache" and "conversation_id" in evidence:
+        return "New Chat 제목과 대화 ID·생성 시각 필드 확인"
+    if rule.definition_id == "connector_global_state":
+        return ("MCP 도구 캐시의 tools 기록 확인" if "mcp-server-tools-cache-v2" in evidence
+                else "플러그인 관련 상태 문자열 확인")
+    return REPORT_CONTENT.get(rule.definition_id, "아티팩트의 수집·분석 기록 확인")
 
 
 def rows_without_conditions(
@@ -279,7 +356,9 @@ def rows_without_conditions(
                         continue
                     if len(relative.parts) < 2:
                         continue
-                    child_names.add(relative.parts[0])
+                    child_name = relative.parts[0]
+                    if child_name.casefold() not in EXCLUDED_PLUGIN_FOLDERS:
+                        child_names.add(child_name)
                 evidence = "하위 폴더명=[" + ", ".join(sorted(child_names, key=str.casefold)) + "]"
             elif definition_id in {"upload_open_mru", "download_open_mru"} and parsed_match:
                 mru_rows = []
