@@ -64,6 +64,10 @@ class Row:
     records: int = 0
     parts: list = None      # 근거를 key=value 단위로 나눈 것
     unit_index: int = -1    # 이 행을 만든 아티팩트의 parsed_artifacts.json 번호
+    rule_artifact: str = "" # 규칙의 아티팩트 이름 (History, Cookies, Local Storage, IndexedDB ...)
+    key_field: str = ""     # HTML의 읽기 쉬운 줄: 시각 열을 만든 레코드에서 규칙에 맞은 대표 필드 이름
+    key_value: object = None  #                    그 값 (시각 값이 아니라 규칙에 맞은 값)
+    key_needle: str = None    #                    contains 규칙이면 찾은 문자열 (긴 값을 자를 때 보이게)
 
     @property
     def action_name(self):
@@ -188,11 +192,18 @@ class Hit:
     prefix: list                                  # 레코드의 JSON 경로 (artifacts[i].records[j]...)
     pairs: list = field(default_factory=list)     # [(경로 문자열, 값, 강조 문자열)]
     time: tuple = None                            # (dt, frac) 중 가장 이른 것
+    primary: tuple = None                         # (필드 이름, 값, 강조 문자열) 대표로 보여 줄 맞은 값
 
     def add(self, parts, value, needle=None):
         key = path_str(self.prefix + parts)
         if all(p[0] != key for p in self.pairs):
             self.pairs.append((key, value, needle))
+
+    def set_primary(self, parts, value, needle=None):
+        """규칙에 맞은 값 중 처음 것을 대표로 둔다. 필드 이름은 경로의 마지막 이름(배열 번호 제외)."""
+        if self.primary is None:
+            names = [p for p in parts if isinstance(p, str)]
+            self.primary = (names[-1] if names else path_str(parts), value, needle)
 
     def add_time(self, t):
         if t and (self.time is None or t[0] < self.time[0]):
@@ -225,6 +236,7 @@ def _match_rule(rule, idx, unit):
             if not _compare(val, rule.op, rule.value):
                 continue
             hit.add(path, val, needle)
+            hit.set_primary(path, val, needle)
             tm = _nearest_time(rec, path, rule.time_fields)
             if tm:
                 hit.add(tm[0], tm[1])
@@ -262,6 +274,7 @@ def downloads_from_claude(rule, idx, unit):
         if not hit.pairs and not via_chain:
             continue
         hit.add(["target_path"], row.get("target_path"))
+        hit.set_primary(["target_path"], row.get("target_path"))      # 내려받은 파일 경로를 대표로
         tm = _nearest_time(row, ["target_path"], rule.time_fields)
         if tm:
             hit.add(tm[0], tm[1])
@@ -270,6 +283,7 @@ def downloads_from_claude(rule, idx, unit):
         for ck in via_chain:
             ch = Hit(["artifacts", idx, "records", c_idx, "rows", ck])
             ch.add(["url"], chains[ck]["url"], "wiggle/download-file")
+            ch.set_primary(["url"], chains[ck]["url"], "wiggle/download-file")
             hits.append(ch)
     return hits
 
@@ -291,9 +305,11 @@ def _make_row(rule, unit, hits):
     if len(text) > CELL_LIMIT:
         text = text[:CELL_LIMIT] + "…(셀 길이 제한으로 생략)"
         parts = [text]
+    key = ordered[0].primary or ("", None, None)                       # 시각 열을 만든(맨 앞) 레코드의 대표 값
     return Row(time=first.time[0] if first else None, has_fraction=first.time[1] if first else False,
                action_id=rule.action_id, artifact=unit.name, path=unit.evidence_path,
-               grade=rule.grade, evidence=text, rule_id=rule.rule_id, records=len(hits), parts=parts)
+               grade=rule.grade, evidence=text, rule_id=rule.rule_id, records=len(hits), parts=parts,
+               rule_artifact=rule.artifact, key_field=key[0], key_value=key[1], key_needle=key[2])
 
 
 # ---------------------------------------------------------------- 행위별 상태
