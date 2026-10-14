@@ -1,391 +1,414 @@
 # -*- coding: utf-8 -*-
-r"""ActTrace HTML 보고서 — 타임라인 · 행위 박스 · 아티팩트 핀.
+r"""ActTrace HTML 보고서 — 팀 통일 형식 (2026-10-13).
 
-설계 (팀 합의, 2026-10-02)
+다른 조 산출물(LLM_Artifact_Report)과 **줄 단위로 맞춰 본다.** 구조 ·
+클래스 이름 · 배지 색까지 같게 둔 이유가 그것이다. 모양을 바꾸면 대조가
+안 된다.
 
-  타임라인 위에 행위(B코드)별 **박스**를 놓고, 그 안에 근거 하나를
-  **핀** 하나로 찍는다.
+    .layout
+      aside.sidebar     [분석 결과] [판정 규칙]  ← 탭으로 화면을 바꾼다
+      main
+        [data-view=analysis]
+          section.overview   분석 개요
+          section.results    행위별 매칭 결과
+              ▸ A00 설치                       매칭 N건
+                  ▸ 2026-10-05 22:05:19.241 KST  매칭 N건
+                      표: 시각|아티팩트|경로|등급|근거
+        [data-view=rules]
+          section.appendix   판정 규칙
 
-    박스 클릭   그 행위의 종합 해석 — 근거 수 · 등급 분포 · 아티팩트 종류
-    핀  클릭    그 근거 하나의 상세 — artifact · type · scope · **경로**
+★ 근거 칸은 평문이 아니라 **구조**다. 그래서 한국어 해석을 열을 더 붙이지
+  않고 그 안에 넣을 수 있다 —
 
-  ★ 아티팩트 내용은 싣지 않는다.
-    Cache 나 History 처럼 큰 것은 한 화면에 못 담는다. 대신 경로를 주고
-    "직접 확인하라" 로 넘긴다. 경로는 복사 버튼과 file:// 링크를 둔다.
-    (브라우저가 탐색기를 직접 띄울 수는 없다 — 보안 정책)
+      [규칙 ID]
+      · 내용 (그래서 무슨 일이 있었나)
+      · 필드 = 값
+      · 시각
+      ▸ 원본 근거 보기        <- 펼치면 artifacts[i].records[j] 표기
 
-  단일 파일이다. 바깥 CSS·JS 를 안 쓴다 (공통 명세 §5 HTML 규약).
-  한국어가 어절 단위로 끊기도록 word-break:keep-all 을 쓴다.
+  표를 훑을 때는 해석이 보이고, 의심스러우면 펼쳐서 원본 위치를 본다.
+  5열 그대로이면서 해석을 잃지 않는다.
+
+내용은 `evidence.rows()` 가 만든 것을 그대로 쓴다 — CSV 와 HTML 이 **같은
+함수에서 나오므로** 둘이 어긋날 수 없다.
+
+★ 아티팩트 내용은 싣지 않는다. Cache·History 처럼 큰 것은 한 화면에 못
+  담는다. 경로를 주고 직접 확인하게 한다.
 """
 import io
-import json
 import os
+import re
 
-from . import uniform
-
-BEHAV_ORDER = ['B01', 'B02', 'B03', 'B04', 'B05', 'B06', 'B07',
-               'B08', 'B09', 'B10', 'B11', 'B12', 'B13']
-
-LEVEL_KO = {'confirmed': '확정', 'suspected': '유력',
-            'presumed': '추정', 'undecided': '판정불가'}
-
-
-def _esc(s):
-    return (str(s or '').replace('&', '&amp;').replace('<', '&lt;')
-            .replace('>', '&gt;').replace('"', '&quot;'))
-
-
-def _pins(infs, obs_by_id):
-    """추론 하나 = 핀 하나. 근거 관찰에서 경로를 끌어온다."""
-    out = []
-    for i in infs:
-        d = i.as_dict() if hasattr(i, 'as_dict') else dict(i)
-        ev = []
-        for oid in (d.get('supported_by') or [])[:12]:
-            o = obs_by_id.get(oid)
-            if not o:
-                continue
-            ev.append({
-                'id': oid,
-                'artifact': o.source_artifact,
-                'type': o.fact_type,
-                'path': o.source_path,
-                'locator': o.source_locator,
-                'status': o.parser_status,
-            })
-        out.append({
-            'id': d.get('id'),
-            'b': d.get('behavior_id'),
-            'name': d.get('behavior_name'),
-            'q': d.get('question'),
-            'level': d.get('confidence'),
-            'from': d.get('when_from') or '',
-            'to': d.get('when_to') or '',
-            'span': d.get('span_sec'),
-            'rule': d.get('rule_id'),
-            'basis': d.get('when_basis') or '',
-            'note': d.get('note') or '',
-            'alts': d.get('alternatives') or [],
-            'arts': sorted({e['artifact'] for e in ev}),
-            'ev': ev,
-        })
-    return out
-
+from . import actions, evidence
 
 _CSS = """
-:root{--bg:#faf9f7;--fg:#1a1a1a;--dim:#6b6b6b;--line:#e0ddd8;--card:#fff;
---c1:#2563eb;--c2:#7c3aed;--c3:#ca8a04;--c4:#9ca3af;--hi:#fef3c7}
-@media(prefers-color-scheme:dark){:root:not([data-theme=light]){
---bg:#1a1917;--fg:#eceae6;--dim:#9a958d;--line:#33312e;--card:#242220;
---c1:#60a5fa;--c2:#a78bfa;--c3:#fbbf24;--c4:#6b7280;--hi:#422006}}
-:root[data-theme=dark]{--bg:#1a1917;--fg:#eceae6;--dim:#9a958d;--line:#33312e;
---card:#242220;--c1:#60a5fa;--c2:#a78bfa;--c3:#fbbf24;--c4:#6b7280;--hi:#422006}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);
-font:14px/1.6 -apple-system,"Segoe UI","Malgun Gothic",sans-serif;
-word-break:keep-all;overflow-wrap:anywhere}
-.wrap{max-width:1180px;margin:0 auto;padding:24px 16px 80px}
-h1{font-size:20px;margin:0 0 4px}
-.sub{color:var(--dim);font-size:13px;margin-bottom:18px}
-.meta{display:grid;grid-template-columns:auto 1fr;gap:2px 14px;
-font-size:12px;color:var(--dim);margin-bottom:22px}
-.meta b{font-weight:600;color:var(--fg)}
-.mono{font-family:ui-monospace,Consolas,"D2Coding",monospace;font-size:12px}
-h2.sec{font-size:14px;margin:26px 0 10px;padding-bottom:6px;
-border-bottom:1px solid var(--line);color:var(--dim);font-weight:600;
-letter-spacing:.02em}
-.g{display:inline-block;font-size:11px;font-weight:700;padding:1px 7px;
-border-radius:3px;white-space:nowrap}
-.gd{background:var(--c1);color:#fff}
-.gs{background:transparent;color:var(--dim);border:1px solid var(--line)}
-.legend{font-size:12px;color:var(--dim);margin:-8px 0 4px}
-.legend .g{margin-right:5px}
-.legend div{margin:3px 0}
-.pathcell{font-family:ui-monospace,Consolas,monospace;font-size:11.5px}
-.axis{position:relative;height:26px;margin:0 0 6px;border-bottom:1px solid var(--line)}
-.axis span{position:absolute;top:6px;font-size:11px;color:var(--dim);
-transform:translateX(-50%);white-space:nowrap}
-.box{background:var(--card);border:1px solid var(--line);border-radius:8px;
-margin-bottom:10px;overflow:hidden}
-.box>summary{list-style:none;cursor:pointer;padding:10px 14px;display:flex;
-gap:10px;align-items:center;flex-wrap:wrap}
-.box>summary::-webkit-details-marker{display:none}
-.box>summary:hover{background:var(--hi)}
-.code{font-weight:700;font-size:12px;padding:2px 7px;border-radius:4px;
-background:var(--c1);color:#fff;flex:none}
-.bname{font-weight:600}
-.cnt{color:var(--dim);font-size:12px;margin-left:auto;flex:none}
-.track{position:relative;height:30px;margin:2px 14px 10px;
-border-top:1px dashed var(--line)}
-.pin{position:absolute;top:6px;width:11px;height:11px;border-radius:50%;
-border:2px solid var(--card);cursor:pointer;transform:translateX(-50%)}
-.pin:hover{outline:2px solid var(--fg)}
-.lv-confirmed{background:var(--c1)}.lv-suspected{background:var(--c2)}
-.lv-presumed{background:var(--c3)}.lv-undecided{background:var(--c4)}
-.inner{padding:0 14px 14px}
-.sum{font-size:13px;color:var(--dim);margin:0 0 10px}
-table{width:100%;border-collapse:collapse;font-size:12.5px}
-.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-th,td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);
-vertical-align:top}
-th{color:var(--dim);font-weight:600;white-space:nowrap}
-tr.row{cursor:pointer}tr.row:hover{background:var(--hi)}
-.tag{display:inline-block;font-size:11px;padding:1px 6px;border-radius:3px;
-border:1px solid var(--line);color:var(--dim);margin-right:4px}
-#panel{position:fixed;right:0;top:0;bottom:0;width:min(440px,92vw);
-background:var(--card);border-left:1px solid var(--line);padding:18px;
-overflow:auto;transform:translateX(100%);transition:transform .18s;z-index:9}
-#panel.on{transform:none;box-shadow:-8px 0 24px rgba(0,0,0,.14)}
-#panel h2{font-size:15px;margin:0 0 2px}
-#panel .x{position:absolute;right:12px;top:10px;cursor:pointer;
-color:var(--dim);font-size:20px;line-height:1;border:0;background:none}
-.kv{display:grid;grid-template-columns:72px 1fr;gap:3px 10px;font-size:12.5px;
-margin:10px 0}
-.kv b{color:var(--dim);font-weight:600}
-.path{background:var(--bg);border:1px solid var(--line);border-radius:6px;
-padding:8px;margin:6px 0;font-family:ui-monospace,Consolas,monospace;
-font-size:11.5px}
-.btn{font:inherit;font-size:11.5px;padding:3px 9px;border:1px solid var(--line);
-border-radius:5px;background:var(--bg);color:var(--fg);cursor:pointer;
-margin:4px 6px 0 0}
-.btn:hover{background:var(--hi)}
-.alt{font-size:12px;color:var(--dim);border-left:2px solid var(--c3);
-padding-left:8px;margin:6px 0}
-.note{font-size:12px;color:var(--dim);margin-top:16px;padding-top:10px;
-border-top:1px solid var(--line)}
-@media(max-width:640px){.wrap{padding:16px}#panel{width:100%}}
+:root { color-scheme:light; --ink:#172033; --muted:#64748b; --line:#dce3ed;
+--panel:#fff; --navy:#17345f; --bg:#f4f7fb; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+font:14px/1.55 Arial,"Malgun Gothic",sans-serif; word-break:keep-all;
+overflow-wrap:break-word; }
+h1 { font-size:28px; margin:0 0 16px; }
+h2 { font-size:19px; margin:0 0 14px; }
+.layout { display:grid; grid-template-columns:190px minmax(0,1fr);
+min-height:100vh; }
+.layout main { min-width:0; padding:26px 32px 40px; }
+.layout main, [data-view], .results, .overview, .appendix,
+details.action, details.match { min-width:0; }
+.sidebar { position:sticky; top:0; height:100vh; background:#10294d;
+color:#fff; padding:22px 12px; }
+.sidebar-brand { font-size:20px; font-weight:800; padding:2px 9px 20px; }
+.sidebar nav { display:grid; gap:7px; }
+.sidebar .nav-tab { width:100%; border:0; border-radius:9px; padding:11px;
+text-align:left; background:transparent; color:#cad6e8; font:inherit;
+font-weight:600; cursor:pointer; }
+.sidebar .nav-tab:hover { background:#ffffff12; color:#fff; }
+.sidebar .nav-tab.active { background:#fff; color:#10294d; }
+.sidebar-note { color:#8fa4c4; font-size:11.5px; line-height:1.5;
+padding:16px 9px 0; }
+.overview, .results, .appendix { background:var(--panel);
+border:1px solid var(--line); border-radius:14px; padding:20px; margin:14px 0;
+box-shadow:0 4px 18px #1720330a; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+gap:10px; }
+.stats div { border:1px solid var(--line); border-radius:10px; padding:11px; }
+.stats span { display:block; color:var(--muted); font-size:12px; }
+.stats strong { font-size:15px; overflow-wrap:anywhere; }
+.stats.sub strong { font:12px/1.5 Consolas,"Malgun Gothic",monospace; }
+.toolbar { display:flex; gap:9px; flex-wrap:wrap; margin:14px 0; }
+.toolbar input { flex:1; min-width:250px; padding:10px 12px;
+border:1px solid #b8c3d3; border-radius:8px; font:inherit; }
+.toolbar button { padding:9px 12px; border:1px solid #9aacbf; background:#fff;
+border-radius:8px; cursor:pointer; font:inherit; }
+details.action { background:#fff; border:1px solid var(--line);
+border-radius:12px; margin:9px 0; overflow:hidden; }
+details.match { background:#fbfcfe; border:1px solid var(--line);
+border-radius:9px; margin:9px 0; overflow:hidden; }
+summary { display:flex; align-items:center; gap:10px; padding:14px 16px;
+cursor:pointer; list-style:none; font-weight:700; }
+summary::-webkit-details-marker { display:none; }
+details.action>summary::after, details.match>summary::after { content:"\\FF0B";
+margin-left:auto; color:var(--muted); font-size:18px; }
+details.action[open]>summary::after,
+details.match[open]>summary::after { content:"\\FF0D"; }
+details.action[open]>summary, details.match[open]>summary {
+border-bottom:1px solid var(--line); }
+summary:focus-visible { outline:2px solid var(--navy); outline-offset:-3px; }
+.action-id { background:var(--navy); color:#fff; border-radius:6px;
+padding:3px 7px; font-weight:700; }
+.summary-meta, .match-meta { color:var(--muted); font-weight:400; }
+.action-body { padding:8px 16px 16px; }
+.match-time { display:inline-flex; gap:7px; align-items:center; }
+.match-date, .match-clock { border:1px solid var(--line); border-radius:6px;
+background:#fff; padding:2px 7px; }
+.match-body { background:#fff; padding:0 12px; }
+.grade { display:inline-block; border-radius:999px; padding:3px 9px;
+font-size:12px; font-weight:700; white-space:nowrap; }
+.direct { background:#dff4e9; color:#155e3d; }
+.supporting { background:#e8f0ff; color:#244b91; }
+.table-wrap { overflow:auto; }
+table { border-collapse:collapse; width:100%; }
+th,td { border-bottom:1px solid var(--line); padding:10px; text-align:left;
+vertical-align:top; }
+th { background:#f7f9fc; color:#31415c; }
+td { overflow-wrap:anywhere; }
+td:first-child { white-space:nowrap; }
+td:nth-child(3) { font:12px/1.55 Consolas,"Malgun Gothic",monospace;
+min-width:250px; word-break:break-all; }
+.match-body th:nth-child(5) { width:520px; }
+.match-body td:nth-child(5) { min-width:520px; white-space:normal;
+word-break:break-word; }
+tbody tr:last-child td { border-bottom:0; }
+.rule-id { display:inline-block; font:700 12px/1.4 Consolas,monospace;
+background:#f1f4f9; border:1px solid var(--line); border-radius:6px;
+padding:2px 7px; color:#31415c; }
+ul.readable { margin:2px 0 6px; padding-left:18px; }
+ul.readable li { margin:2px 0; }
+.rv-note { font-weight:600; }
+.rv-field { color:var(--muted); font-family:Consolas,monospace; font-size:12px; }
+.rv-value { font-family:Consolas,monospace; font-size:12px;
+word-break:break-all; }
+.rv-time { color:#244b91; white-space:nowrap; }
+details.raw > summary { display:list-item; list-style:disclosure-closed inside;
+cursor:pointer; color:var(--muted); font-size:12px; padding:2px 0;
+font-weight:400; }
+details.raw[open] > summary { list-style-type:disclosure-open; }
+details.raw > summary::after { content:none; }
+details.raw pre { white-space:pre-wrap; word-break:break-all;
+font:12px/1.55 Consolas,"Malgun Gothic",monospace; background:#f7f9fc;
+border:1px solid var(--line); border-radius:7px; padding:9px; margin:5px 0 0; }
+.appendix table { min-width:1200px; table-layout:fixed; }
+.appendix td { font-size:13px; }
+.appendix td.mono { font:12px Consolas,monospace; }
+.empty { border:1px dashed #b8c3d3; border-radius:9px; padding:15px;
+color:var(--muted); }
+.note { color:var(--muted); font-size:12.5px; margin-top:14px; }
+[hidden] { display:none !important; }
+@media(max-width:860px) {
+.layout { display:block; }
+.layout main { padding:14px; }
+.sidebar { position:static; height:auto; padding:12px; }
+.sidebar-brand { padding:2px 9px 10px; }
+.sidebar nav { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.results,.overview,.appendix { padding:14px; } }
 """
 
 _JS = """
-var DATA=%s;
-function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,
-function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
-function copy(t,el){
-  var ok=function(){var o=el.textContent;el.textContent='복사됨';
-    setTimeout(function(){el.textContent=o},1200)};
-  try{navigator.clipboard.writeText(t).then(ok,function(){fb(t,ok)})}
-  catch(e){fb(t,ok)}}
-function fb(t,ok){try{var a=document.createElement('textarea');a.value=t;
-  document.body.appendChild(a);a.select();document.execCommand('copy');
-  document.body.removeChild(a);ok()}catch(e){}}
-function panel(html){var p=document.getElementById('panel');
-  document.getElementById('pbody').innerHTML=html;p.classList.add('on')}
-function closeP(){document.getElementById('panel').classList.remove('on')}
-function showPin(id){
-  var p=null;for(var i=0;i<DATA.pins.length;i++){if(DATA.pins[i].id===id){p=DATA.pins[i];break}}
-  if(!p)return;
-  var h='<h2>'+esc(p.name)+'</h2><div class="sub mono">'+esc(p.id)+' · '+esc(p.rule)+'</div>';
-  h+='<div class="kv"><b>등급</b><span>'+esc(p.levelKo)+'</span>';
-  h+='<b>시각</b><span class="mono">'+esc(p.from||'—');
-  if(p.to&&p.to!==p.from)h+=' ~ '+esc(p.to);
-  if(p.span)h+=' ('+esc(p.span)+'초)';
-  h+='</span><b>근거</b><span>'+esc(p.basis||'—')+'</span></div>';
-  if(p.note)h+='<p>'+esc(p.note)+'</p>';
-  (p.alts||[]).forEach(function(a){h+='<div class="alt">배제 못 한 설명 — '+esc(a)+'</div>'});
-  h+='<div class="note"><b>아티팩트 '+p.ev.length+'건</b> — 내용은 싣지 않는다. 경로에서 직접 확인한다.</div>';
-  p.ev.forEach(function(e){
-    h+='<div class="path"><div><span class="tag">'+esc(e.artifact)+'</span>';
-    h+='<span class="tag">'+esc(e.type)+'</span>';
-    if(e.status&&e.status!=='ok')h+='<span class="tag">'+esc(e.status)+'</span>';
-    h+='</div><div style="margin-top:6px">'+esc(e.path||'—')+'</div>';
-    if(e.locator)h+='<div style="color:var(--dim);margin-top:3px">'+esc(e.locator)+'</div>';
-    var full=(DATA.root?DATA.root+'\\\\':'')+(e.path||'');
-    h+='<button class="btn" onclick="copy('+JSON.stringify(full).replace(/"/g,'&quot;')+',this)">경로 복사</button>';
-    h+='<a class="btn" href="file:///'+esc(full.replace(/\\\\/g,'/'))+'" target="_blank">열기</a>';
-    h+='<span class="tag mono">'+esc(e.id)+'</span></div>'});
-  panel(h)}
-function showBox(b){
-  var ps=DATA.pins.filter(function(p){return p.b===b});
-  if(!ps.length)return;
-  var lv={},ar={},ts=[];
-  ps.forEach(function(p){lv[p.levelKo]=(lv[p.levelKo]||0)+1;
-    (p.arts||[]).forEach(function(a){ar[a]=(ar[a]||0)+1});
-    if(p.from)ts.push(p.from)});
-  ts.sort();
-  var h='<h2>'+esc(b)+' '+esc((DATA.bnames||{})[b]||ps[0].name)+'</h2>';
-  h+='<div class="sub">근거 '+ps.length+'건</div>';
-  h+='<div class="kv"><b>등급</b><span>'+Object.keys(lv).map(function(k){
-    return esc(k)+' '+lv[k]}).join(' · ')+'</span>';
-  h+='<b>구간</b><span class="mono">'+(ts.length?esc(ts[0])+' ~ '+esc(ts[ts.length-1]):'—')+'</span>';
-  h+='<b>아티팩트</b><span>'+Object.keys(ar).map(function(k){
-    return esc(k)+'×'+ar[k]}).join(', ')+'</span></div>';
-  var n=Object.keys(ar).length;
-  h+='<p>서로 다른 아티팩트 '+n+'종이 같은 행위를 가리킨다.'+
-     (n>1?' 한 출처가 틀려도 나머지가 남는다.':' 출처가 하나뿐이라 교차검증이 안 된다.')+'</p>';
-  h+='<div class="note">핀을 누르면 근거 하나하나의 경로가 나온다.</div>';
-  panel(h)}
-document.addEventListener('keydown',function(e){if(e.key==='Escape')closeP()});
+const views = Array.from(document.querySelectorAll('[data-view]'));
+for (const button of document.querySelectorAll('[data-view-button]')) {
+  button.addEventListener('click', () => {
+    const sel = button.dataset.viewButton;
+    for (const v of views) v.hidden = v.dataset.view !== sel;
+    for (const nav of document.querySelectorAll('[data-view-button]')) {
+      nav.classList.toggle('active', nav === button);
+      nav.setAttribute('aria-selected', nav === button ? 'true' : 'false');
+    }
+  });
+}
+const search = document.getElementById('search');
+const actions = Array.from(document.querySelectorAll('details.action'));
+function filterActions() {
+  const q = search.value.trim().toLocaleLowerCase();
+  for (const action of actions) {
+    const hitName = action.querySelector('.action-name')
+      .textContent.toLocaleLowerCase().includes(q);
+    let visible = 0;
+    for (const match of action.querySelectorAll('details.match')) {
+      let rows = 0;
+      for (const row of match.querySelectorAll('tbody tr')) {
+        const hit = !q || hitName ||
+          row.textContent.toLocaleLowerCase().includes(q);
+        row.hidden = !hit;
+        if (hit) rows++;
+      }
+      match.hidden = rows === 0;
+      visible += rows;
+    }
+    action.hidden = visible === 0;
+  }
+}
+search.addEventListener('input', filterActions);
+function setAll(open) {
+  for (const d of document.querySelectorAll('details.action, details.match'))
+    d.open = open;
+}
+document.getElementById('expand').addEventListener('click', () => setAll(true));
+document.getElementById('collapse').addEventListener('click',
+  () => setAll(false));
 """
 
 
-def write_html(outdir, obs, infs, meta, urows=None):
-    """ActTrace 보고서를 단일 HTML 파일로 낸다.
+def _esc(s):
+    return (str(s if s is not None else '').replace('&', '&amp;')
+            .replace('<', '&lt;').replace('>', '&gt;').replace('"', '&quot;'))
 
-    urows 는 report.csv 와 **같은** 통일 4열 행이다. 같은 입력을 쓰므로
-    표와 CSV 가 어긋날 수 없다. 안 주면 여기서 만든다 (단독 호출 대비).
+
+_PAIR = re.compile(r'^([A-Za-z_][\w.\[\]]*)=(.*)$')
+
+
+def _readable(r):
+    r"""근거를 읽을 수 있는 목록으로 편다.
+
+    CSV 의 `근거` 는 `artifacts[0].records[0].name="x"; @loc; 외 3건` 꼴로
+    한 줄이다. 표에서는 그걸 그대로 보여 주면 읽히지 않으므로 앞 몇 개를
+    `필드 = 값` 으로 끊어 낸다. 전체는 '원본 근거 보기' 안에 그대로 둔다.
     """
-    if urows is None:
-        urows = uniform.rows(obs, infs, BEHAV_ORDER)
-    # 토글 제목은 **표준 행위 이름**으로 단다. 규칙이 추론마다 붙인 이름
-    # ('사용자가 직접 실행' 처럼)을 제목에 쓰면 CSV 의 '행위 분류' 와
-    # 글자가 달라져 두 표가 같은 것인지 알 수 없게 된다.
-    try:
-        BNAMES = uniform._names()
-    except Exception:
-        BNAMES = {}
-    by_art = {}
-    for r in urows:
-        by_art.setdefault(r['b'], []).append(r)
-    obs_by_id = {o.id: o for o in obs}
-    pins = _pins(infs, obs_by_id)
-    for p in pins:
-        p['levelKo'] = LEVEL_KO.get(p['level'], p['level'])
+    out = []
+    for chunk in (r.get('근거') or '').split('; '):
+        chunk = chunk.strip()
+        if not chunk or chunk.startswith('@') or chunk.startswith('외 '):
+            continue
+        m = _PAIR.match(chunk)
+        if not m:
+            continue
+        field, val = m.group(1), m.group(2).strip()
+        # 인덱스 접두사는 떼고 필드만 보여 준다 — 전체 경로는 원본 쪽에
+        field = field.rsplit('.', 1)[-1]
+        out.append((field, val.strip('"')))
+        if len(out) >= 3:
+            break
+    return out
 
-    # 시간축 — 시각이 있는 핀만으로 범위를 잡는다
-    ts = sorted(p['from'] for p in pins if p['from'])
-    t0, t1 = (ts[0], ts[-1]) if ts else ('', '')
 
-    def pos(v):
-        """ISO 시각 -> 0~100%. 못 재면 None."""
-        if not v or not t0 or t0 == t1:
-            return None
+def write_html(outdir, obs, infs, meta, erows=None):
+    """팀 통일 형식 HTML. 내용은 CSV 와 같은 행에서 나온다."""
+    env = meta.get('env_profile') or ''
+    if erows is None:
+        erows = evidence.rows(obs, infs, env)
+
+    by_act = {}
+    for r in erows:
+        by_act.setdefault((r['code'], r['사용자 행위']), []).append(r)
+
+    def akey(k):
         try:
-            a, b, c = t0[:19], t1[:19], v[:19]
-            import datetime as dt
-            f = '%Y-%m-%dT%H:%M:%S'
-            A = dt.datetime.strptime(a, f)
-            B = dt.datetime.strptime(b, f)
-            C = dt.datetime.strptime(c, f)
-            span = (B - A).total_seconds()
-            if span <= 0:
-                return None
-            return max(0.0, min(100.0, 100.0 * (C - A).total_seconds() / span))
-        except Exception:
-            return None
+            return (actions.ORDER.index(k[0]), k[0])
+        except ValueError:
+            return (len(actions.ORDER), k[0])
 
-    by_b = {}
-    for p in pins:
-        by_b.setdefault(p['b'], []).append(p)
+    nd = sum(1 for r in erows if r['등급'] == evidence.DIRECT)
+    title = 'LLM_Artifact_Report'
 
     H = []
     a = H.append
-    a('<!doctype html><html lang="ko"><head><meta charset="utf-8">')
-    a('<meta name="viewport" content="width=device-width,initial-scale=1">')
-    a('<title>ActTrace 행위 재구성</title><style>%s</style></head><body>' % _CSS)
-    a('<div class="wrap">')
-    a('<h1>ActTrace — 행위 재구성</h1>')
-    a('<div class="sub">타임라인 위 상자가 행위, 점이 근거 하나다. '
-      '점을 누르면 그 근거가 나온 <b>파일 경로</b>가 나온다.</div>')
+    a('<!doctype html>')
+    a('<html lang="ko">')
+    a('<head>')
+    a('<meta charset="utf-8">')
+    a('<meta name="viewport" content="width=device-width, initial-scale=1">')
+    a('<title>%s</title>' % _esc(title))
+    a('<style>%s</style>' % _CSS)
+    a('</head>')
+    a('<body>')
+    a('<div class="layout">')
 
-    a('<h2 class="sec">개요</h2>')
-    a('<div class="meta">')
-    for k, v in (('입력', meta.get('input')), ('지문', meta.get('input_sha256')),
-                 ('환경', meta.get('env_profile')),
-                 ('도구', '%s %s (명세 v%s)' % (meta.get('tool'),
-                                               meta.get('tool_version'),
-                                               meta.get('spec_version'))),
-                 ('실행', '%s ~ %s' % (meta.get('started_at'),
-                                       meta.get('finished_at'))),
-                 ('결과', '관찰 %s · 추론 %s · 문제 %s'
-                  % (meta.get('observations'), meta.get('inferences'),
-                     meta.get('problems')))):
-        a('<b>%s</b><span class="mono">%s</span>' % (_esc(k), _esc(v)))
+    # ── 사이드바 ─────────────────────────────────────────────
+    a('<aside class="sidebar">')
+    a('<div class="sidebar-brand">ActTrace</div>')
+    a('<nav>')
+    a('<button type="button" class="nav-tab active" data-view-button="analysis"'
+      ' aria-selected="true">분석 결과</button>')
+    a('<button type="button" class="nav-tab" data-view-button="rules"'
+      ' aria-selected="false">판정 규칙</button>')
+    a('</nav>')
+    a('</aside>')
+
+    a('<main>')
+    a('<h1>%s</h1>' % _esc(title))
+
+    # ── 분석 결과 ────────────────────────────────────────────
+    a('<div data-view="analysis">')
+    a('<section class="overview" aria-label="분석 개요">')
+    a('<h2>분석 개요</h2>')
+    a('<div class="stats">')
+    for lab, val in (
+            ('분석 대상', 'Claude Desktop'),
+            ('입력 형식', (meta.get('input_kind') or '-')),
+            ('매칭 행위', '%d개' % len(by_act)),
+            ('근거 개수', '직접 %d / 보조 %d' % (nd, len(erows) - nd)),
+    ):
+        a('<div><span>%s</span><strong>%s</strong></div>'
+          % (_esc(lab), _esc(val)))
     a('</div>')
+    a('</section>')
 
-    # 등급의 뜻을 보고서 안에 적는다. 표만 보고 '직접' 을 제 느낌대로
-    # 읽으면 통일한 의미가 없다.
-    a('<div class="legend">')
-    a('<div><span class="g gd">%s</span>%s</div>'
-      % (_esc(uniform.DIRECT), _esc(uniform.GRADE_DEF[uniform.DIRECT])))
-    a('<div><span class="g gs">%s</span>%s</div>'
-      % (_esc(uniform.SUPPORT), _esc(uniform.GRADE_DEF[uniform.SUPPORT])))
-    a('</div>')
+    a('<section class="results">')
+    a('<h2>행위별 매칭 결과</h2>')
+    a('<div class="toolbar">'
+      '<input id="search" type="search" aria-label="행위명, 아티팩트 또는 경로 검색"'
+      ' placeholder="행위명, 아티팩트 또는 경로 검색">'
+      '<button id="expand" type="button">모두 펼치기</button>'
+      '<button id="collapse" type="button">모두 접기</button></div>')
 
-    a('<h2 class="sec">행위</h2>')
-
-    if t0:
-        a('<div class="axis">')
-        for frac, lab in ((0, t0[11:19]), (50, '·'), (100, t1[11:19])):
-            a('<span style="left:%d%%">%s</span>' % (frac, _esc(lab)))
-        a('</div>')
-
-    for b in BEHAV_ORDER:
-        ps = by_b.get(b)
-        if not ps:
+    # ★ A00~A14 를 **전부** 찍는다. 매칭이 없는 행위도 '매칭 0건' 으로
+    #   남긴다 — 0건은 결과지 부재가 아니다. 목록에서 빠지면 '안 했다' 와
+    #   '못 찾았다' 가 구분되지 않는다.
+    by_code = {}
+    for (c, n), rs in by_act.items():
+        by_code[c] = (n, rs)
+    for code in actions.ORDER:
+        name, rs = by_code.get(code, (actions.name_of(code, env), []))
+        a('<details class="action">')
+        a('<summary><span class="action-id">%s</span> '
+          '<span class="action-name">%s</span>'
+          '<span class="summary-meta">매칭 %d건</span></summary>'
+          % (_esc(code), _esc(name), len(rs)))
+        a('<div class="action-body">')
+        if not rs:
+            a('<p class="empty">해당 아티팩트 없음</p>')
+            a('</div></details>')
             continue
-        ps.sort(key=lambda x: (x['from'] or '', x['id']))
-        lv = {}
-        for p in ps:
-            lv[p['levelKo']] = lv.get(p['levelKo'], 0) + 1
-        arts = sorted({x for p in ps for x in p['arts']})
-        a('<details class="box"%s>' % (' open' if len(ps) <= 6 else ''))
-        a('<summary onclick="showBox(\'%s\')">' % _esc(b))
-        a('<span class="code">%s</span>' % _esc(b))
-        a('<span class="bname">%s</span>'
-          % _esc(BNAMES.get(b) or ps[0]['name']))
-        gr = by_art.get(b) or []
-        nd = sum(1 for r in gr if r['아티팩트 등급'] == uniform.DIRECT)
-        ns = len(gr) - nd
-        a('<span class="cnt">%s %d · %s %d · 근거 %d</span>'
-          % (_esc(uniform.DIRECT), nd, _esc(uniform.SUPPORT), ns, len(ps)))
-        a('</summary>')
 
-        a('<div class="track">')
-        for p in ps:
-            x = pos(p['from'])
-            if x is None:
-                continue
-            a('<span class="pin lv-%s" style="left:%.2f%%" title="%s"'
-              ' onclick="showPin(\'%s\')"></span>'
-              % (_esc(p['level']), x,
-                 _esc((p['from'][11:19] + ' ' + (p['note'] or ''))[:60]),
-                 _esc(p['id'])))
-        a('</div>')
+        groups = {}
+        for r in rs:
+            groups.setdefault(r['시각'], []).append(r)
+        for t in sorted(groups, key=lambda x: (x == '-', x)):
+            g = groups[t]
+            if t == '-':
+                date, clock = '시각 없음', ''
+            else:
+                part = t.split(' ', 1)
+                date = part[0]
+                clock = part[1] if len(part) > 1 else ''
+            a('<details class="match"><summary><span class="match-time">'
+              '<span class="match-date">%s</span>%s</span>'
+              '<span class="match-meta">매칭 %d건</span></summary>'
+              % (_esc(date),
+                 ('<span class="match-clock">%s</span>' % _esc(clock))
+                 if clock else '', len(g)))
+            a('<div class="match-body table-wrap"><table>')
+            a('<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th>'
+              '<th>등급</th><th>근거</th></tr></thead>')
+            a('<tbody>')
+            for r in g:
+                cls = ('direct' if r['등급'] == evidence.DIRECT
+                       else 'supporting')
+                ev = ['<span class="rule-id">%s</span>'
+                      % _esc(r.get('규칙') or '-')]
+                ev.append('<ul class="readable">')
+                note = r.get('내용') or ''
+                if note and note != '-':
+                    ev.append('<li class="rv-note">%s</li>' % _esc(note))
+                for field, val in _readable(r):
+                    ev.append('<li><span class="rv-field">%s</span> = '
+                              '<span class="rv-value">%s</span></li>'
+                              % (_esc(field), _esc(val)))
+                if r['시각'] != '-':
+                    ev.append('<li class="rv-time">%s</li>' % _esc(r['시각']))
+                ev.append('</ul>')
+                ev.append('<details class="raw"><summary>원본 근거 보기'
+                          '</summary><pre>%s</pre></details>'
+                          % _esc(r.get('근거') or '-'))
+                a('<tr><td>%s</td><td>%s</td><td>%s</td>'
+                  '<td><span class="grade %s">%s</span></td><td>%s</td></tr>'
+                  % (_esc(r['시각']), _esc(r['아티팩트']), _esc(r['경로']),
+                     cls, _esc(r['등급']), ''.join(ev)))
+            a('</tbody></table></div></details>')
+        a('</div></details>')
 
-        a('<div class="inner">')
-        # ── 팀 합의 표 : 아티팩트 | 경로 | 아티팩트 등급 ──
-        #   report.csv 의 같은 행위 부분과 한 줄씩 그대로 맞는다.
-        a('<div class="scroll"><table>')
-        a('<tr><th>아티팩트</th><th>경로</th><th>아티팩트 등급</th></tr>')
-        for r in gr:
-            cls = 'gd' if r['아티팩트 등급'] == uniform.DIRECT else 'gs'
-            a('<tr><td>%s</td><td class="pathcell">%s</td>'
-              '<td><span class="g %s">%s</span></td></tr>'
-              % (_esc(r['아티팩트']), _esc(r['경로'] or '—'), cls,
-                 _esc(r['아티팩트 등급'])))
-        if not gr:
-            a('<tr><td colspan="3">근거 관찰에 경로가 붙지 않았다</td></tr>')
-        a('</table></div>')
-
-        # ── 아래는 ActTrace 고유 — 시각 · 판정 등급 · 근거 수 ──
-        a('<p class="sum">근거 %d건 · 아티팩트 %d종 — %s</p>'
-          % (len(ps), len(arts), _esc(', '.join(arts))))
-        a('<div class="scroll"><table><tr><th>시각</th><th>등급</th>'
-          '<th>출처</th><th>내용</th><th>근거</th></tr>')
-        for p in ps:
-            a('<tr class="row" onclick="showPin(\'%s\')">' % _esc(p['id']))
-            a('<td class="mono">%s</td>' % _esc(p['from'][11:23] or '—'))
-            a('<td>%s</td>' % _esc(p['levelKo']))
-            a('<td>%s</td>' % _esc(' · '.join(p['arts']) or '—'))
-            a('<td>%s</td>' % _esc(p['note'] or p['basis'] or ''))
-            a('<td class="mono">%d건</td>' % len(p['ev']))
-            a('</tr>')
-        a('</table></div></div></details>')
-
-    a('<div class="note">아티팩트 내용은 이 보고서에 싣지 않는다. '
-      'Cache 나 History 처럼 큰 것은 한 화면에 담기지 않으므로, '
-      '경로를 주고 직접 확인하게 한다. 판단 근거의 원본은 '
-      '<span class="mono">observations.jsonl</span> 에 있다.</div>')
+    a('</section>')
     a('</div>')
-    a('<aside id="panel"><button class="x" onclick="closeP()">&times;</button>'
-      '<div id="pbody"></div></aside>')
 
-    payload = {'pins': pins, 'root': meta.get('input') or '',
-               'bnames': BNAMES}
-    a('<script>%s</script>' % (_JS % json.dumps(payload, ensure_ascii=False)))
+    # ── 판정 규칙 ────────────────────────────────────────────
+    a('<div data-view="rules" hidden>')
+    a('<section class="appendix">')
+    a('<h2>부록: 판정 규칙</h2>')
+    a('<div class="table-wrap"><table>')
+    a('<thead><tr><th>규칙 ID</th><th>행위</th><th>아티팩트</th>'
+      '<th>필터</th><th>시각 필드</th><th>비고</th></tr></thead><tbody>')
+    seen = {}
+    for r in erows:
+        k = (r.get('규칙') or '', r['code'], r['사용자 행위'])
+        g = seen.setdefault(k, {'arts': set(), 'n': 0, 'grade': set(),
+                                'note': r.get('내용') or '', 'fields': []})
+        g['arts'].add(r['아티팩트'])
+        g['grade'].add(r['등급'])
+        g['n'] += 1
+        for f, v in _readable(r):
+            s = '%s=%s' % (f, v)
+            if s not in g['fields']:
+                g['fields'].append(s)
+    for k in sorted(seen, key=lambda x: (akey((x[1], x[2])), x[0])):
+        g = seen[k]
+        arts = ', '.join(sorted(g['arts'])[:3])
+        if len(g['arts']) > 3:
+            arts += ' 외 %d' % (len(g['arts']) - 3)
+        a('<tr><td class="mono">%s</td><td>%s %s</td><td>%s</td>'
+          '<td class="mono">%s</td><td>%s</td><td>%s</td></tr>'
+          % (_esc(k[0] or '-'), _esc(k[1]), _esc(k[2]), _esc(arts),
+             _esc('; '.join(g['fields'][:3]) or '-'),
+             _esc(' · '.join(sorted(g['grade'])) + ' / %d건' % g['n']),
+             _esc(g['note'][:110])))
+    a('</tbody></table></div>')
+    a('</section>')
+    a('</div>')
+
+    a('</main>')
+    a('</div>')
+    a('<script>%s</script>' % _JS)
     a('</body></html>')
 
-    p = os.path.join(outdir, 'report.html')
+    p = os.path.join(outdir, 'LLM_Artifact_Report.html')
     with io.open(p, 'w', encoding='utf-8', newline='\n') as f:
         f.write('\n'.join(H))
     return p

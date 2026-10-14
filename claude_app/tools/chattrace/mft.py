@@ -50,6 +50,23 @@ def filetime_str(v):
     return '%s.%07d' % (dt.strftime('%Y-%m-%d %H:%M:%S'), v % 10000000)
 
 
+def filetime_iso(v):
+    """FILETIME(100ns) -> 'YYYY-MM-DDTHH:MM:SS.mmmZ' (공통 명세 §6 시각 규약).
+
+    filetime_str 과 나누어 둔 이유 — 그쪽은 MFTECmd 출력과 글자까지 맞춘
+    형식(공백 구분 · 소수점 7자리 · Z 없음)이라 대조에 쓴다. 그 값을
+    ts_* 필드에 그대로 넣으면 ISO 가 아니어서 downstream 파싱이 깨진다.
+    실제로 그랬다 — 타임라인 핀이 전부 사라졌고 밀리초가 잘렸다.
+    """
+    if not v:
+        return ''
+    try:
+        dt = _EPOCH + datetime.timedelta(microseconds=v // 10)
+    except (OverflowError, OSError):
+        return ''
+    return dt.strftime('%Y-%m-%dT%H:%M:%S.') + '%03dZ' % ((v // 10000) % 1000)
+
+
 def filetime_dt(v):
     """정렬용 datetime. 100ns 잔여는 버린다(비교에는 영향 없음)."""
     if not v:

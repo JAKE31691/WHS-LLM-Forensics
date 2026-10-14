@@ -68,7 +68,8 @@ class Observation(object):
     __slots__ = ('id', 'source_artifact', 'source_path', 'source_locator',
                  'parser', 'parser_status', 'parser_note',
                  'fact_type', 'fact', 'ts', 'tz_source', 'seq',
-                 'actor', 'env_profile', 'confidence', 'confidence_basis')
+                 'actor', 'env_profile', 'confidence', 'confidence_basis',
+                 'duplicate_paths')
 
     def __init__(self, oid, artifact, path, locator, fact_type, fact,
                  parser='', status='ok', note='', ts=None, seq=None,
@@ -91,6 +92,9 @@ class Observation(object):
         # 관찰의 신뢰도는 '제대로 읽었는가' 다. 행위 신뢰도와 다르다.
         self.confidence = confidence
         self.confidence_basis = basis or {}
+        # 같은 사실이 다른 경로에도 있었다면 그 경로들. 지우지 않고 남긴다 —
+        # 두 곳에서 나왔다는 것 자체가 출처 정보다.
+        self.duplicate_paths = []
 
     def as_dict(self):
         d = {'id': self.id, 'schema_version': SCHEMA_VERSION,
@@ -103,7 +107,8 @@ class Observation(object):
              'tz_source': self.tz_source, 'seq': self.seq,
              'actor': self.actor, 'env_profile': self.env_profile,
              'confidence': self.confidence,
-             'confidence_basis': self.confidence_basis}
+             'confidence_basis': self.confidence_basis,
+             'duplicate_paths': self.duplicate_paths}
         d.update(self.ts)
         return d
 

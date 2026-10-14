@@ -28,7 +28,8 @@ from collections import Counter, defaultdict
 from chattrace import anim
 
 from . import (applog, content, history, identity, install_order,
-               localstorage, prefetch, registry, rules, uniform)
+               localstorage, prefetch, registry, rules, uniform,
+               evidence, bundle)
 from .schema import LEVEL_KO, Ids, Observation, UNDECIDED, write_jsonl
 
 
@@ -92,12 +93,49 @@ INF_COLS = ['id', 'question', 'behavior_id', 'behavior_name', 'confidence',
 
 SPEC_VERSION = '1'
 
+
+def _merge_key(o):
+    """같은 사실인가를 판정하는 열쇠. 경로만 빼고 전부 본다."""
+    return (o.source_artifact, o.fact_type, o.source_locator, o.seq, o.actor,
+            json.dumps(o.fact, sort_keys=True, ensure_ascii=False),
+            json.dumps(o.ts, sort_keys=True))
+
+
+def _merge_dupes(got, seen):
+    """내용이 같고 경로만 다른 관찰을 하나로 합친다.
+
+    ★ 왜 필요한가 — 수집물은 KAPE 와 robocopy 가 Claude 폴더를 **둘 다**
+      담는 일이 흔하다. 그러면 같은 LevelDB 를 두 번 읽어 같은 사실이 두 벌
+      생긴다. 수가 부푸는 것으로 끝나지 않는다. 식별자 없이 관찰을 순회하는
+      규칙은 **없던 사건을 만든다** — 실측에서 R-REPLY-TIMING-01 이 응답을
+      8번이 아니라 16번 받았다고 냈다.
+
+      수집 스크립트를 고치는 것은 반쪽이다. 남이 뜬 수집물에는 안 먹고,
+      KAPE 가 원래 그렇게 동작한다. 도구가 걸러야 한다.
+
+      지우지 않고 **합친다.** 버린 쪽의 경로는 duplicate_paths 에 남는다.
+    """
+    out = []
+    merged = 0
+    for o in got:
+        k = _merge_key(o)
+        keep = seen.get(k)
+        if keep is None:
+            seen[k] = o
+            out.append(o)
+            continue
+        if (o.source_path and o.source_path != keep.source_path
+                and o.source_path not in keep.duplicate_paths):
+            keep.duplicate_paths.append(o.source_path)
+        merged += 1
+    return out, merged
+
 #: 통일 CLI 출력의 '아티팩트 정의' 목록. 순서는 파싱 순서와 같다.
 #  이름을 영문으로 둔 이유 — 다른 환경의 출력과 줄 단위로 맞춰 본다.
 ARTIFACT_DEFS = ('Local Storage', 'Prefetch', 'Application Log',
                  'Account Identity', 'Registry', 'Install Order',
                  'Browser History', 'Conversation Content')
-TOOL_VERSION = '1.3.0'
+TOOL_VERSION = '1.4.0'
 
 
 def _sha256(path, cap=None):
@@ -183,7 +221,7 @@ def _write_summary(outdir, obs, infs, meta, nbad):
         f.write('\n'.join(lines))
 
 
-def _write(outdir, obs, infs):
+def _write(outdir, obs, infs, env_profile='', meta=None, root=None):
     write_jsonl(os.path.join(outdir, 'observations.jsonl'), obs)
     write_jsonl(os.path.join(outdir, 'inferences.jsonl'), infs)
 
@@ -266,14 +304,29 @@ def _write(outdir, obs, infs):
     #   behaviors.csv 와 observations.jsonl 에 그대로 남는다.
     from . import rules as _r
     urows = uniform.rows(obs, infs, sorted(_r.BEHAVIORS))
-    uniform.write_csv(outdir, urows)
+    uniform.write_csv(outdir, urows, name='report_4col.csv')
+
+    # 팀 합의 6열 (2026-10-09) — 시각/행위/아티팩트/경로/등급/근거
+    #   판정규칙 1개 × 파일 1개 = 한 줄. 시각은 KST.
+    # ★ parsed_artifacts.json 을 먼저 만든다. 근거 열이 그 파일의
+    #   인덱스(artifacts[i].records[j])를 가리키기 때문이다 — 중간 파일
+    #   없이는 남의 도구로 근거를 따라갈 수 없다.
+    pdoc, pindex = bundle.build_parsed(obs, meta or {})
+    erows = evidence.rows(obs, infs, env_profile, index=pindex)
+    #  report.csv        팀 형식 — 원시 근거만. 다른 조 표와 그대로 대조한다
+    #  report_상세.csv   해석을 앞에 붙인 판 — 사람이 읽는다
+    evidence.write_csv(outdir, erows, name='LLM_Artifact_Report.csv')
+    evidence.write_csv(outdir, erows, name='LLM_Artifact_Report_상세.csv',
+                       cols=evidence.COLS_FULL)
+    # parsed_artifacts.json 은 zip 을 묶은 뒤에 쓴다 — 수집 결과
+    # (collected_members · collection_status)가 doc 에 채워져야 한다.
 
     bad = [o for o in obs if o.parser_status != 'ok']
     _csv(os.path.join(outdir, 'problems.csv'),
          ['id', 'source_artifact', 'source_path', 'parser',
           'parser_status', 'parser_note'],
          [o.as_dict() for o in bad])
-    return len(bad), urows
+    return len(bad), urows, erows, pdoc
 
 
 def _console(obs, infs, nbad, secs, outdir):
@@ -525,27 +578,36 @@ def main(argv=None):
     # 정의별 집계 — 'Found: n files' 는 실제로 읽은 파일 수다.
     #   관찰 수와 파일 수는 다른 값이라 둘 다 센다.
     groups = {}
+    # 경로만 다른 같은 사실을 합치는 색인. 파서 사이를 가로지른다 —
+    # Local Storage 를 robocopy 사본과 KAPE 사본에서 각각 읽기 때문이다.
+    _seen = {}
+    _merged = [0]
 
     def _tally(name, got):
-        g = groups.setdefault(name, {'files': 0, 'obs': 0, 'bad': 0})
+        got, m = _merge_dupes(got, _seen)
+        _merged[0] += m
+        g = groups.setdefault(name, {'files': 0, 'obs': 0, 'bad': 0,
+                                     'merged': 0})
+        g['merged'] += m
         g['files'] += len({o.source_path for o in got if o.source_path})
         g['obs'] += len(got)
         # problems.csv · 꼬리의 Failed 와 같은 기준으로 센다 (ok 가 아닌 것).
         # 기준이 다르면 같은 화면에 서로 다른 숫자가 나와 사람을 헷갈린다.
         g['bad'] += sum(1 for o in got if o.parser_status != 'ok')
+        return got
 
     for k, (defname, title, fn) in enumerate(STEPS, 1):
         with anim.UI.stage(title, total=len(STEPS)) as st:
             st.update(done=k, note='%d/%d' % (k, len(STEPS)))
             got = _step(title, fn)
-        _tally(defname, got)
-        obs += got
+        obs += _tally(defname, got)
     convs = _load_conversations(a.conversations)
     with anim.UI.stage('대화 내용을 대조하는 중'):
         got = _step('content', lambda: content.parse(
             root, ids, log=plog, env_profile=a.profile, convs=convs))
-    _tally('Conversation Content', got)
-    obs += got
+    obs += _tally('Conversation Content', got)
+    if _merged[0]:
+        say('   경로만 다른 같은 사실 %s건을 합쳤다' % format(_merged[0], ','))
     plog('   관찰 %s건' % format(len(obs), ','))
     if convs:
         plog('   대화 %d개를 초안·식별자 대조에 쓴다' % len(convs))
@@ -556,13 +618,15 @@ def main(argv=None):
         infs = rules.run(obs, ids, convs)
     plog('   추론 %s건' % format(len(infs), ','))
 
-    nbad, urows = _write(a.output, obs, infs)
+    nbad, urows, erows, pdoc = _write(a.output, obs, infs, a.profile,
+                                     meta, root)
 
     meta.update({
         'finished_at': _now_iso(),
         'observations': len(obs),
         'inferences': len(infs),
         'problems': nbad,
+        'merged_duplicates': _merged[0],
     })
     _write_run(a.output, meta)
     _write_summary(a.output, obs, infs, meta, nbad)
@@ -570,15 +634,27 @@ def main(argv=None):
     # 통일 CLI 출력 — 수집 · 분석 · 산출물 · 요약
     nfiles, nobs, nfail = uniform.collection(say, groups, ARTIFACT_DEFS)
     nact, _nd, _ns = uniform.analysis(say, urows)
+    say('   팀 합의 6열 report.csv — %d줄 (판정규칙 1개 × 파일 1개)' % len(erows))
     uniform.generated(say, 'CSV', os.path.join(os.path.abspath(a.output),
-                                               'report.csv'))
+                                               'LLM_Artifact_Report.csv'))
+    # 원본 아티팩트 수집본 — collected_path 가 parsed_artifacts.json 과
+    # 1:1 로 맞아야 '근거 -> 원본' 추적이 끊기지 않는다.
+    try:
+        zp, zn = bundle.write_zip(a.output, root, pdoc, log=say)
+        uniform.generated(say, 'ZIP', zp)
+    except Exception as e:
+        say('   collected_artifacts.zip 실패: %s: %s' % (type(e).__name__, e))
+    bundle.write_parsed(a.output, pdoc)
+    uniform.generated(say, 'JSON', os.path.join(os.path.abspath(a.output),
+                                                'parsed_artifacts.json'))
 
     # 사람이 브라우저로 보는 보고서 — 개요 · 행위 토글 · 아티팩트 등급
-    htmlp = os.path.join(os.path.abspath(a.output), 'report.html')
+    htmlp = os.path.join(os.path.abspath(a.output),
+                         'LLM_Artifact_Report.html')
     html_ok = True
     try:
         from . import report as _rep
-        _rep.write_html(a.output, obs, infs, meta, urows)
+        _rep.write_html(a.output, obs, infs, meta, erows)
     except Exception as e:
         html_ok = False
         say('   report.html 생성 실패: %s: %s' % (type(e).__name__, e))

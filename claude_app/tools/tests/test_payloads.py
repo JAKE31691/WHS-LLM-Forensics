@@ -29,7 +29,8 @@ sys.path.insert(0, os.path.dirname(HERE))
 
 from chattrace import codec                                    # noqa: E402
 from chattrace.scenarios import BlobIndex                      # noqa: E402
-from actrace.content import _payloads, LOCALPATH_RX, FILENAME_RX  # noqa: E402
+from actrace.content import (_payloads, _v8_cut,              # noqa: E402
+                             LOCALPATH_RX, FILENAME_RX)
 from actrace.app import _now_iso                               # noqa: E402
 
 # 표식. 양성은 블롭 안에만, 음성은 어디에도 넣지 않는다.
@@ -88,6 +89,22 @@ def upload_record(marker):
     """R1 이 실측한 업로드 레코드 모양. 표식을 localPath 에 넣는다."""
     return (b'\x00\x06file_kind\x00blob\x00\x09file_name"CONTROL-A.pdf"'
             b'\x00\x0bsize_bytes\x00\x09localPath"' + marker + b'"\x00')
+
+
+SEP = chr(92)
+
+
+def codec_varint(n):
+    """V8 길이 varint — 하위 7비트씩, 이어지면 0x80."""
+    out = bytearray()
+    while True:
+        b = n & 0x7F
+        n >>= 7
+        if n:
+            out.append(b | 0x80)
+        else:
+            out.append(b)
+            return bytes(out)
 
 
 def main():
@@ -175,6 +192,67 @@ def main():
         ok = re.match(r'^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$', ts)
         check(bool(ok), '시각이 밀리초까지 나온다 (%s)' % ts,
               '명세 §6 ② 위반. %f 가 빠지면 ".Z" 가 된다')
+
+        # ── 7. 경로만 다른 같은 사실은 합친다 (KAPE dedup 함정) ──
+        #   수집물은 KAPE 와 robocopy 가 Claude 폴더를 둘 다 담는다.
+        #   그러면 같은 LevelDB 를 두 번 읽어 없던 사건이 생긴다 —
+        #   실측에서 R-REPLY-TIMING-01 이 응답을 8번이 아니라 16번
+        #   받았다고 냈다. 수가 부푸는 게 아니라 **사실이 틀린다.**
+        from actrace.app import _merge_dupes
+        from actrace.schema import Observation
+
+        def _obs(oid, path, val):
+            return Observation(oid, 'localstorage', path, 'key=x',
+                               'app_event', {'event': val},
+                               ts={'ts_event': '2026-10-06T00:00:00.000Z'},
+                               seq=1)
+
+        A = r'app' + SEP + r'Local Storage' + SEP + 'leveldb'
+        B = r'kape' + SEP + 'C' + SEP + 'Users' + SEP + 'K' + SEP + 'leveldb'
+        kept, merged = _merge_dupes(
+            [_obs('obs:1', A, 'sent'), _obs('obs:2', B, 'sent')], {})
+        check(len(kept) == 1 and merged == 1,
+              '양성 통제 — 경로만 다른 같은 사실을 합쳤다',
+              '합치지 않으면 관찰 수와 추론 수가 두 배로 부풀린다')
+        check(kept and B in kept[0].duplicate_paths,
+              '버린 쪽 경로를 duplicate_paths 에 남긴다',
+              '지우면 안 된다 — 두 곳에서 나왔다는 것도 출처 정보다')
+        kept2, merged2 = _merge_dupes(
+            [_obs('obs:3', A, 'sent'), _obs('obs:4', B, 'copied')], {})
+        check(len(kept2) == 2 and merged2 == 0,
+              '음성 통제 — 내용이 다르면 안 합친다',
+              '내용이 다른데 합치면 사실을 잃는다')
+
+        # ── 8. V8 객체 끝 태그 `{` 를 경로로 먹지 않는다 ──────────
+        #   실측 T8-pre 업로드 경로 33건 중 10건이 `S01-chart.png{` 였다.
+        #   localPath 가 객체의 마지막 속성이면 뒤에 0x7B 가 붙는다.
+        def _v8(key, val):
+            return (b'"' + bytearray([len(key)]) + key + b'"'
+                    + codec_varint(len(val)) + val)
+
+        P = rb'C:\TestData\S01-chart.png'
+        rec = _v8(b'file_name', b'S01-chart.png') + _v8(b'localPath', P) \
+            + b'{\x02'
+        got = [_v8_cut(rec, m) for m in LOCALPATH_RX.finditer(rec)]
+        check(got == [P],
+              '양성 통제 — 끝 태그 `{` 를 길이 바이트로 잘라냈다',
+              '뽑힌 것: %r' % got)
+        names = [_v8_cut(rec, m) for m in FILENAME_RX.finditer(rec)]
+        check(names[:1] == [b'S01-chart.png'],
+              'file_name 도 길이로 자른다', '뽑힌 것: %r' % names)
+
+        LONG = b'C:\\' + b'D' * 150 + b'\\x.pdf'          # 2바이트 varint
+        rec2 = _v8(b'localPath', LONG) + b'{\x01'
+        got2 = [_v8_cut(rec2, m) for m in LOCALPATH_RX.finditer(rec2)]
+        check(got2 == [LONG],
+              '127자 넘는 경로도 2바이트 길이로 자른다 (%d자)' % len(LONG),
+              '뽑힌 것 길이: %r' % [len(g) for g in got2])
+
+        js = b'{"localPath":"' + P + b'{x"}'
+        got3 = [_v8_cut(js, m) for m in LOCALPATH_RX.finditer(js)]
+        check(got3 == [P + b'{x'],
+              '음성 통제 — 길이 바이트가 없는 JSON 은 손대지 않는다',
+              '뽑힌 것: %r' % got3)
 
         print('  ' + '-' * 58)
         if _fail:

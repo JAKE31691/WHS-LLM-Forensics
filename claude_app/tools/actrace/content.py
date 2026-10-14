@@ -41,6 +41,31 @@ LOCALPATH_RX = re.compile(
     rb'localPath"?.{0,4}?([A-Za-z]:\\[^\x00-\x1f"]{2,200})')
 FILENAME_RX = re.compile(rb'file_name"?.{0,4}?([^\x00-\x1f"]{1,120})')
 
+
+def _v8_cut(buf, m, g=1):
+    """정규식이 잡은 문자열을 V8 길이 바이트로 자른다.
+
+    V8 문자열은 `0x22 <길이> <바이트>` 다. 객체의 마지막 속성이면 바로
+    뒤에 객체 끝 태그 `{`(0x7B)가 붙는데, 정규식은 따옴표·제어문자에서만
+    끊으니 `S01-chart.png{` 처럼 그것까지 먹는다. 앞의 길이를 읽을 수
+    있으면 그 길이로 자르고, 아니면(JSON 문자열 등) 잡은 그대로 둔다.
+    """
+    s, b = m.start(g), m.group(g)
+    pre = bytearray(buf[max(0, s - 3):s])
+    # 길이는 varint 다 — 127 자까지 1바이트, 그 위로 2바이트
+    for k in (1, 2):
+        if len(pre) < k + 1 or pre[-k - 1] != 0x22:
+            continue
+        lb = pre[-k:]
+        if any(x & 0x80 for x in lb[:-1]) != (k > 1) or lb[-1] & 0x80:
+            continue
+        n = 0
+        for i, x in enumerate(lb):
+            n |= (x & 0x7F) << (7 * i)
+        if 0 < n <= len(b):
+            return b[:n]
+    return b
+
 # R3 이 찾은 임시 대화 키
 TEMP_RX = re.compile(rb'incognito_temporary_conversation_uuid')
 
@@ -149,13 +174,13 @@ def parse(root, ids, log=None, env_profile='', convs=None):
             # ── Q4 업로드: 원본 절대 경로 ────────────────────
             for buf, src in bufs:
                 for m in LOCALPATH_RX.finditer(buf):
-                    p = m.group(1).decode('latin1', 'replace').rstrip('"\\ ')
+                    p = _v8_cut(buf, m).decode('latin1', 'replace').rstrip('"\\ ')
                     if len(p) < 4:
                         continue
                     fn = ''
                     fm = FILENAME_RX.search(buf, max(0, m.start() - 400), m.start())
                     if fm:
-                        fn = fm.group(1).decode('utf-8', 'replace')[:120]
+                        fn = _v8_cut(buf, fm).decode('utf-8', 'replace')[:120]
                     n_up += 1
                     obs.append(Observation(
                         ids.next('obs'), 'indexeddb', rel, loc, 'file_upload',

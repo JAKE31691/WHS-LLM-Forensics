@@ -122,9 +122,14 @@ def rows(obs, infs, behav_order=None, names=None):
     return sorted(acc.values(), key=k)
 
 
-def write_csv(outdir, rws):
-    """report.csv — 팀 합의 4열. 다른 환경의 표와 그대로 맞춰 본다."""
-    p = os.path.join(outdir, 'report.csv')
+def write_csv(outdir, rws, name='report.csv'):
+    """팀 합의 4열 (2026-10-05 판).
+
+    2026-10-09 에 6열로 바뀌어 report.csv 는 evidence.py 가 쓴다.
+    이 4열은 report_4col.csv 로 남긴다 — 다른 조가 아직 4열이면
+    그쪽과 맞춰 볼 때 쓴다.
+    """
+    p = os.path.join(outdir, name)
     # .csv 는 BOM 을 넣는다 (공통 명세 인코딩 규약). 없으면 엑셀·
     # PowerShell 이 cp949 로 읽어 한글이 깨진다.
     with io.open(p, 'w', encoding='utf-8-sig', newline='') as f:

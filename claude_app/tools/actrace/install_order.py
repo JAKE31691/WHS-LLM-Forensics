@@ -110,8 +110,8 @@ def parse(root, ids, log=None, env_profile=''):
             {'stage': stage, 'entry': r['entry'], 'seq': r['seq'],
              'is_dir': r['is_dir'], 'in_use': r['in_use'],
              'path_status': r.get('path_status', '')},
-            ts={'ts_mft_si_created': mftmod.filetime_str(r['si_created']),
-                'ts_mft_si_modified': mftmod.filetime_str(r['si_modified'])},
+            ts={'ts_mft_si_created': mftmod.filetime_iso(r['si_created']),
+                'ts_mft_si_modified': mftmod.filetime_iso(r['si_modified'])},
             env_profile=env_profile))
     say('   설치 단계 %d개 (엔트리 번호로 순서 확정)'
         % sum(1 for o in obs if o.fact_type == 'install_stage'))

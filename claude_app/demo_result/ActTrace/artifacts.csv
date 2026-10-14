@@ -3,7 +3,6 @@ applog,kape\C\Users\Kwon\AppData\Local\Claude\logs\main.log,200,2026-09-19T11:04
 bam,kape\C\Windows\System32\config\SYSTEM,2,2026-09-19T02:04:12.538Z,2026-09-19T06:21:05.567Z,bam,ok
 browser_history,kape\C\Users\Kwon\AppData\Local\Microsoft\Edge\User Data\Default\History,13,2026-09-19T02:02:23.039Z,2026-09-19T02:02:55.398Z,browser_history,ok
 cookies,app\Network\Cookies,36,2026-09-19T02:04:21.895Z,2026-09-19T06:50:48.882Z,cookies,ok
-cookies,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Network\Cookies,36,2026-09-19T02:04:21.895Z,2026-09-19T06:50:48.882Z,cookies,ok
 identity_dir,app\claude-code-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d,2,,,identity_dir,ok
 identity_dir,app\claude-code-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788,1,,,identity_dir,ok
 identity_dir,app\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d,2,,,identity_dir,ok
@@ -12,23 +11,14 @@ identity_dir,app\local-agent-mode-sessions\skills-plugin\45543fda-8483-4e56-a0cd
 identity_dir,app\local-agent-mode-sessions\skills-plugin\84f1e338-3681-4143-87c8-e224a4b8fd08,1,,,identity_dir,ok
 identity_dir,app\spaces-present\7612a620,2,,,identity_dir,ok
 identity_dir,app\spaces-present\88c48471,1,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d,1,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d,1,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\88c48471-0af1-48bc-b6b9-de2d2c446788,1,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\skills-plugin\45543fda-8483-4e56-a0cd-84f711a63ab0,1,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\skills-plugin\84f1e338-3681-4143-87c8-e224a4b8fd08,1,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\spaces-present\7612a620,2,,,identity_dir,ok
-identity_dir,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\spaces-present\88c48471,1,,,identity_dir,ok
 indexeddb,conversations.json,6,2026-09-19T06:40:02.263Z,2026-09-19T06:50:14.632Z,indexeddb,ok
 localstorage,app\Local Storage\leveldb,230,2026-09-19T02:04:23.965Z,2026-09-19T06:50:26.967Z,localstorage,ok
-localstorage,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb,230,2026-09-19T02:04:23.965Z,2026-09-19T06:50:26.967Z,localstorage,ok
-mft,Program Files\WindowsApps\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc,1,2026-09-19 02:03:43.2637329,2026-09-19 02:04:08.4380555,mft,ok
-mft,ProgramData\Microsoft\Windows\AppRepository\Packages\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc,1,2026-09-19 02:04:08.4353751,2026-09-19 02:04:10.4477871,mft,ok
-mft,ProgramData\Packages\Claude_pzs8sxrjxfjjc,1,2026-09-19 02:04:10.3058986,2026-09-19 02:04:10.3076171,mft,ok
-mft,Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc,1,2026-09-19 02:04:10.2958262,2026-09-19 02:04:10.3183521,mft,ok
-mft,Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude,1,2026-09-19 02:04:19.2094220,2026-09-19 06:50:59.2961618,mft,ok
+mft,Program Files\WindowsApps\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc,1,2026-09-19T02:03:43.263Z,2026-09-19T02:04:08.438Z,mft,ok
+mft,ProgramData\Microsoft\Windows\AppRepository\Packages\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc,1,2026-09-19T02:04:08.435Z,2026-09-19T02:04:10.447Z,mft,ok
+mft,ProgramData\Packages\Claude_pzs8sxrjxfjjc,1,2026-09-19T02:04:10.305Z,2026-09-19T02:04:10.307Z,mft,ok
+mft,Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc,1,2026-09-19T02:04:10.295Z,2026-09-19T02:04:10.318Z,mft,ok
+mft,Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude,1,2026-09-19T02:04:19.209Z,2026-09-19T06:50:59.296Z,mft,ok
 plan_usage,app\plan-usage-history.json,6,2026-09-19T06:14:39.923Z,2026-09-19T06:45:38.592Z,plan_usage,ok
-plan_usage,kape\C\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\plan-usage-history.json,6,2026-09-19T06:14:39.923Z,2026-09-19T06:45:38.592Z,plan_usage,ok
 prefetch,kape\C\Windows\prefetch\CLAUDE SETUP.EXE-9F370D47.pf,3,2026-09-19T02:03:26.310Z,2026-09-19T02:03:37.922Z,prefetch,ok
 prefetch,kape\C\Windows\prefetch\CLAUDE.EXE-0659240F.pf,9,2026-09-19T06:13:32.763Z,2026-09-19T06:49:44.946Z,prefetch,ok
 prefetch,kape\C\Windows\prefetch\CLAUDE.EXE-06592410.pf,9,2026-09-19T06:13:34.581Z,2026-09-19T06:39:51.139Z,prefetch,ok

@@ -1,0 +1,529 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LLM_Artifact_Report</title>
+<style>
+:root { color-scheme:light; --ink:#172033; --muted:#64748b; --line:#dce3ed;
+--panel:#fff; --navy:#17345f; --bg:#f4f7fb; }
+* { box-sizing:border-box; }
+body { margin:0; background:var(--bg); color:var(--ink);
+font:14px/1.55 Arial,"Malgun Gothic",sans-serif; word-break:keep-all;
+overflow-wrap:break-word; }
+h1 { font-size:28px; margin:0 0 16px; }
+h2 { font-size:19px; margin:0 0 14px; }
+.layout { display:grid; grid-template-columns:190px minmax(0,1fr);
+min-height:100vh; }
+.layout main { min-width:0; padding:26px 32px 40px; }
+.layout main, [data-view], .results, .overview, .appendix,
+details.action, details.match { min-width:0; }
+.sidebar { position:sticky; top:0; height:100vh; background:#10294d;
+color:#fff; padding:22px 12px; }
+.sidebar-brand { font-size:20px; font-weight:800; padding:2px 9px 20px; }
+.sidebar nav { display:grid; gap:7px; }
+.sidebar .nav-tab { width:100%; border:0; border-radius:9px; padding:11px;
+text-align:left; background:transparent; color:#cad6e8; font:inherit;
+font-weight:600; cursor:pointer; }
+.sidebar .nav-tab:hover { background:#ffffff12; color:#fff; }
+.sidebar .nav-tab.active { background:#fff; color:#10294d; }
+.sidebar-note { color:#8fa4c4; font-size:11.5px; line-height:1.5;
+padding:16px 9px 0; }
+.overview, .results, .appendix { background:var(--panel);
+border:1px solid var(--line); border-radius:14px; padding:20px; margin:14px 0;
+box-shadow:0 4px 18px #1720330a; }
+.stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr));
+gap:10px; }
+.stats div { border:1px solid var(--line); border-radius:10px; padding:11px; }
+.stats span { display:block; color:var(--muted); font-size:12px; }
+.stats strong { font-size:15px; overflow-wrap:anywhere; }
+.stats.sub strong { font:12px/1.5 Consolas,"Malgun Gothic",monospace; }
+.toolbar { display:flex; gap:9px; flex-wrap:wrap; margin:14px 0; }
+.toolbar input { flex:1; min-width:250px; padding:10px 12px;
+border:1px solid #b8c3d3; border-radius:8px; font:inherit; }
+.toolbar button { padding:9px 12px; border:1px solid #9aacbf; background:#fff;
+border-radius:8px; cursor:pointer; font:inherit; }
+details.action { background:#fff; border:1px solid var(--line);
+border-radius:12px; margin:9px 0; overflow:hidden; }
+details.match { background:#fbfcfe; border:1px solid var(--line);
+border-radius:9px; margin:9px 0; overflow:hidden; }
+summary { display:flex; align-items:center; gap:10px; padding:14px 16px;
+cursor:pointer; list-style:none; font-weight:700; }
+summary::-webkit-details-marker { display:none; }
+details.action>summary::after, details.match>summary::after { content:"\FF0B";
+margin-left:auto; color:var(--muted); font-size:18px; }
+details.action[open]>summary::after,
+details.match[open]>summary::after { content:"\FF0D"; }
+details.action[open]>summary, details.match[open]>summary {
+border-bottom:1px solid var(--line); }
+summary:focus-visible { outline:2px solid var(--navy); outline-offset:-3px; }
+.action-id { background:var(--navy); color:#fff; border-radius:6px;
+padding:3px 7px; font-weight:700; }
+.summary-meta, .match-meta { color:var(--muted); font-weight:400; }
+.action-body { padding:8px 16px 16px; }
+.match-time { display:inline-flex; gap:7px; align-items:center; }
+.match-date, .match-clock { border:1px solid var(--line); border-radius:6px;
+background:#fff; padding:2px 7px; }
+.match-body { background:#fff; padding:0 12px; }
+.grade { display:inline-block; border-radius:999px; padding:3px 9px;
+font-size:12px; font-weight:700; white-space:nowrap; }
+.direct { background:#dff4e9; color:#155e3d; }
+.supporting { background:#e8f0ff; color:#244b91; }
+.table-wrap { overflow:auto; }
+table { border-collapse:collapse; width:100%; }
+th,td { border-bottom:1px solid var(--line); padding:10px; text-align:left;
+vertical-align:top; }
+th { background:#f7f9fc; color:#31415c; }
+td { overflow-wrap:anywhere; }
+td:first-child { white-space:nowrap; }
+td:nth-child(3) { font:12px/1.55 Consolas,"Malgun Gothic",monospace;
+min-width:250px; word-break:break-all; }
+.match-body th:nth-child(5) { width:520px; }
+.match-body td:nth-child(5) { min-width:520px; white-space:normal;
+word-break:break-word; }
+tbody tr:last-child td { border-bottom:0; }
+.rule-id { display:inline-block; font:700 12px/1.4 Consolas,monospace;
+background:#f1f4f9; border:1px solid var(--line); border-radius:6px;
+padding:2px 7px; color:#31415c; }
+ul.readable { margin:2px 0 6px; padding-left:18px; }
+ul.readable li { margin:2px 0; }
+.rv-note { font-weight:600; }
+.rv-field { color:var(--muted); font-family:Consolas,monospace; font-size:12px; }
+.rv-value { font-family:Consolas,monospace; font-size:12px;
+word-break:break-all; }
+.rv-time { color:#244b91; white-space:nowrap; }
+details.raw > summary { display:list-item; list-style:disclosure-closed inside;
+cursor:pointer; color:var(--muted); font-size:12px; padding:2px 0;
+font-weight:400; }
+details.raw[open] > summary { list-style-type:disclosure-open; }
+details.raw > summary::after { content:none; }
+details.raw pre { white-space:pre-wrap; word-break:break-all;
+font:12px/1.55 Consolas,"Malgun Gothic",monospace; background:#f7f9fc;
+border:1px solid var(--line); border-radius:7px; padding:9px; margin:5px 0 0; }
+.appendix table { min-width:1200px; table-layout:fixed; }
+.appendix td { font-size:13px; }
+.appendix td.mono { font:12px Consolas,monospace; }
+.empty { border:1px dashed #b8c3d3; border-radius:9px; padding:15px;
+color:var(--muted); }
+.note { color:var(--muted); font-size:12.5px; margin-top:14px; }
+[hidden] { display:none !important; }
+@media(max-width:860px) {
+.layout { display:block; }
+.layout main { padding:14px; }
+.sidebar { position:static; height:auto; padding:12px; }
+.sidebar-brand { padding:2px 9px 10px; }
+.sidebar nav { grid-template-columns:repeat(2,minmax(0,1fr)); }
+.results,.overview,.appendix { padding:14px; } }
+</style>
+</head>
+<body>
+<div class="layout">
+<aside class="sidebar">
+<div class="sidebar-brand">ActTrace</div>
+<nav>
+<button type="button" class="nav-tab active" data-view-button="analysis" aria-selected="true">분석 결과</button>
+<button type="button" class="nav-tab" data-view-button="rules" aria-selected="false">판정 규칙</button>
+</nav>
+</aside>
+<main>
+<h1>LLM_Artifact_Report</h1>
+<div data-view="analysis">
+<section class="overview" aria-label="분석 개요">
+<h2>분석 개요</h2>
+<div class="stats">
+<div><span>분석 대상</span><strong>Claude Desktop</strong></div>
+<div><span>입력 형식</span><strong>collection</strong></div>
+<div><span>매칭 행위</span><strong>9개</strong></div>
+<div><span>근거 개수</span><strong>직접 28 / 보조 19</strong></div>
+</div>
+</section>
+<section class="results">
+<h2>행위별 매칭 결과</h2>
+<div class="toolbar"><input id="search" type="search" aria-label="행위명, 아티팩트 또는 경로 검색" placeholder="행위명, 아티팩트 또는 경로 검색"><button id="expand" type="button">모두 펼치기</button><button id="collapse" type="button">모두 접기</button></div>
+<details class="action">
+<summary><span class="action-id">A00</span> <span class="action-name">설치</span><span class="summary-meta">매칭 4건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:19.241 KST</span></span><span class="match-meta">매칭 4건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:19.241 KST</td><td>Claude_2.2553.1.0_x64__pzs8sxrjxfjjc</td><td>C:\ProgramData\Microsoft\Windows\AppRepository\Packages\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-INSTALL-ORDER-01</span><ul class="readable"><li class="rv-note">설치 4단계 순서 정상</li><li><span class="rv-field">stage</span> = <span class="rv-value">패키지 등록</span></li><li><span class="rv-field">entry</span> = <span class="rv-value">198492</span></li><li><span class="rv-field">seq</span> = <span class="rv-value">3</span></li><li class="rv-time">2026-10-05 22:05:19.241 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[21].records[0].stage=&quot;패키지 등록&quot;; artifacts[21].records[0].entry=198492; artifacts[21].records[0].seq=3; @entry=198492</pre></details></td></tr>
+<tr><td>2026-10-05 22:05:19.241 KST</td><td>Claude_2.2553.1.0_x64__pzs8sxrjxfjjc</td><td>C:\Program Files\WindowsApps\Claude_2.2553.1.0_x64__pzs8sxrjxfjjc</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-INSTALL-ORDER-01</span><ul class="readable"><li class="rv-note">설치 4단계 순서 정상</li><li><span class="rv-field">stage</span> = <span class="rv-value">프로그램 본체</span></li><li><span class="rv-field">entry</span> = <span class="rv-value">198721</span></li><li><span class="rv-field">seq</span> = <span class="rv-value">4</span></li><li class="rv-time">2026-10-05 22:05:19.241 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[22].records[0].stage=&quot;프로그램 본체&quot;; artifacts[22].records[0].entry=198721; artifacts[22].records[0].seq=4; @entry=198721</pre></details></td></tr>
+<tr><td>2026-10-05 22:05:19.241 KST</td><td>Claude_pzs8sxrjxfjjc</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-INSTALL-ORDER-01</span><ul class="readable"><li class="rv-note">설치 4단계 순서 정상</li><li><span class="rv-field">stage</span> = <span class="rv-value">사용자 컨테이너</span></li><li><span class="rv-field">entry</span> = <span class="rv-value">228661</span></li><li><span class="rv-field">seq</span> = <span class="rv-value">2</span></li><li class="rv-time">2026-10-05 22:05:19.241 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[23].records[0].stage=&quot;사용자 컨테이너&quot;; artifacts[23].records[0].entry=228661; artifacts[23].records[0].seq=2; @entry=228661</pre></details></td></tr>
+<tr><td>2026-10-05 22:05:19.241 KST</td><td>Claude</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-INSTALL-ORDER-01</span><ul class="readable"><li class="rv-note">설치 4단계 순서 정상</li><li><span class="rv-field">stage</span> = <span class="rv-value">앱 저장소</span></li><li><span class="rv-field">entry</span> = <span class="rv-value">230574</span></li><li><span class="rv-field">seq</span> = <span class="rv-value">2</span></li><li class="rv-time">2026-10-05 22:05:19.241 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[25].records[0].stage=&quot;앱 저장소&quot;; artifacts[25].records[0].entry=230574; artifacts[25].records[0].seq=2; @entry=230574</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A01</span> <span class="action-name">실행</span><span class="summary-meta">매칭 18건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:46.000 (현지)</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:46.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-APPSTART-LOG-01</span><ul class="readable"><li class="rv-note">앱 기동 4건</li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li><span class="rv-field">message</span> = <span class="rv-value">Starting app {</span></li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li class="rv-time">2026-10-05 22:05:46.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[0].level=&quot;info&quot;; artifacts[9].records[0].message=&quot;Starting app {&quot;; @main.log:1; artifacts[9].records[16].level=&quot;info&quot;; artifacts[9].records[16].message=&quot;Starting app {&quot;; @main.log:731; artifacts[9].records[48].level=&quot;info&quot;; artifacts[9].records[48].message=&quot;Starting app {&quot;; @...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:46.828 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:46.828 KST</td><td>CLAUDE.EXE-06592413.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-06592413.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE [메인] 실행 4회 · 시각 4개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">06592413</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">4</span></li><li class="rv-time">2026-10-05 22:05:46.828 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[4].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[4].records[0].hash=&quot;06592413&quot;; artifacts[4].records[0].run_count=4; @CLAUDE.EXE-06592413.pf; artifacts[4].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[4].records[1].hash=&quot;06592413&quot;; artifacts[4].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:47.320 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:47.320 KST</td><td>CLAUDE.EXE-06592411.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-06592411.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 5회 · 시각 5개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">06592411</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">5</span></li><li class="rv-time">2026-10-05 22:05:47.320 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[3].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[3].records[0].hash=&quot;06592411&quot;; artifacts[3].records[0].run_count=5; @CLAUDE.EXE-06592411.pf; artifacts[3].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[3].records[1].hash=&quot;06592411&quot;; artifacts[3].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:47.525 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:47.525 KST</td><td>CLAUDE.EXE-0659241A.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-0659241A.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 5회 · 시각 5개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">0659241A</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">5</span></li><li class="rv-time">2026-10-05 22:05:47.525 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[6].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[6].records[0].hash=&quot;0659241A&quot;; artifacts[6].records[0].run_count=5; @CLAUDE.EXE-0659241A.pf; artifacts[6].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[6].records[1].hash=&quot;0659241A&quot;; artifacts[6].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:50.488 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:50.488 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-FIRSTRUN-01</span><ul class="readable"><li class="rv-note">앱 버전 2.2553.1</li><li><span class="rv-field">version</span> = <span class="rv-value">2.2553.1</span></li><li><span class="rv-field">docs</span> = <span class="rv-value">1</span></li><li class="rv-time">2026-10-05 22:05:50.488 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[0].version=&quot;2.2553.1&quot;; artifacts[0].records[0].docs=1; @000005.ldb+0x53CA seq=5 key=persisted.desktop-version-seen; 외 2건</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:51.000 (현지)</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:51.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-PAGELOAD-LOG-01</span><ul class="readable"><li class="rv-note">claude.ai 로드 3건</li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li><span class="rv-field">message</span> = <span class="rv-value">Loaded https://claude.ai (web commit aa6da7d0d3a86c1fc9a5…(총 135자)</span></li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li class="rv-time">2026-10-05 22:05:51.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[8].level=&quot;info&quot;; artifacts[9].records[8].message=&quot;Loaded https://claude.ai (web commit aa6da7d0d3a86c1fc9a5…(총 135자)&quot;; @main.log:139; artifacts[9].records[51].level=&quot;info&quot;; artifacts[9].records[51].message=&quot;Loaded https://claude.ai (web commit aa6da7d0d3a86c1fc9a5…(총 135자)&quot;; ...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:53.371 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:53.371 KST</td><td>CLAUDE.EXE-0659241D.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-0659241D.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 6회 · 시각 6개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">0659241D</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">6</span></li><li class="rv-time">2026-10-05 22:05:53.371 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[8].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[8].records[0].hash=&quot;0659241D&quot;; artifacts[8].records[0].run_count=6; @CLAUDE.EXE-0659241D.pf; artifacts[8].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[8].records[1].hash=&quot;0659241D&quot;; artifacts[8].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:06:04.908 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:06:04.908 KST</td><td>History</td><td>C:\Users\Kwon\AppData\Local\Microsoft\Edge\User Data\Default\History</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-BROWSER-VISIT-01</span><ul class="readable"><li class="rv-note">AI 서비스 방문 16건</li><li><span class="rv-field">browser</span> = <span class="rv-value">Edge</span></li><li><span class="rv-field">url</span> = <span class="rv-value">https://claude.ai/</span></li><li><span class="rv-field">title</span> = <span class="rv-value"></span></li><li class="rv-time">2026-10-05 22:06:04.908 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[26].records[0].browser=&quot;Edge&quot;; artifacts[26].records[0].url=&quot;https://claude.ai/&quot;; artifacts[26].records[0].title=&quot;&quot;; @page=6 offset=3525; artifacts[26].records[2].browser=&quot;Edge&quot;; artifacts[26].records[2].url=&quot;https://claude.ai/login/app-google-auth?open_in_browser=1…(총 100자)&quot;; artifacts...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:29.784 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:29.784 KST</td><td>CLAUDE.EXE-0659240F.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-0659240F.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 3회 · 시각 3개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">0659240F</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">3</span></li><li class="rv-time">2026-10-05 22:07:29.784 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[1].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[1].records[0].hash=&quot;0659240F&quot;; artifacts[1].records[0].run_count=3; @CLAUDE.EXE-0659240F.pf; artifacts[1].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[1].records[1].hash=&quot;0659240F&quot;; artifacts[1].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:47.312 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:47.312 KST</td><td>CLAUDE.EXE-06592419.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-06592419.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 3회 · 시각 3개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">06592419</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">3</span></li><li class="rv-time">2026-10-05 22:07:47.312 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[5].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[5].records[0].hash=&quot;06592419&quot;; artifacts[5].records[0].run_count=3; @CLAUDE.EXE-06592419.pf; artifacts[5].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[5].records[1].hash=&quot;06592419&quot;; artifacts[5].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:18:52.071 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:18:52.071 KST</td><td>CLAUDE.EXE-0659241B.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-0659241B.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 3회 · 시각 3개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">0659241B</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">3</span></li><li class="rv-time">2026-10-05 22:18:52.071 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[7].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[7].records[0].hash=&quot;0659241B&quot;; artifacts[7].records[0].run_count=3; @CLAUDE.EXE-0659241B.pf; artifacts[7].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[7].records[1].hash=&quot;0659241B&quot;; artifacts[7].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e5...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:23:47.027 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:23:47.027 KST</td><td>CLAUDE.EXE-06592410.pf</td><td>C:\Windows\prefetch\CLAUDE.EXE-06592410.pf</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-RUN-PF-01</span><ul class="readable"><li class="rv-note">CLAUDE.EXE 실행 12회 · 시각 8개</li><li><span class="rv-field">name</span> = <span class="rv-value">CLAUDE.EXE</span></li><li><span class="rv-field">hash</span> = <span class="rv-value">06592410</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">12</span></li><li class="rv-time">2026-10-05 22:23:47.027 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[2].records[0].name=&quot;CLAUDE.EXE&quot;; artifacts[2].records[0].hash=&quot;06592410&quot;; artifacts[2].records[0].run_count=12; @CLAUDE.EXE-06592410.pf; artifacts[2].records[1].name=&quot;CLAUDE.EXE&quot;; artifacts[2].records[1].hash=&quot;06592410&quot;; artifacts[2].records[1].full_path=&quot;\VOLUME{01dd47d1a801100f-4ca81e...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:37:29.091 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:37:29.091 KST</td><td>SYSTEM</td><td>C:\Windows\System32\config\SYSTEM</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-BAM-SID-01</span><ul class="readable"><li class="rv-note">SID 2643766-1001 · 대상 1개</li><li><span class="rv-field">sid</span> = <span class="rv-value">s-1-5-21-4076072684-3337085050-2082643766-1001</span></li><li><span class="rv-field">target</span> = <span class="rv-value">Claude_pzs8sxrjxfjjc</span></li><li><span class="rv-field">is_package</span> = <span class="rv-value">True</span></li><li class="rv-time">2026-10-05 22:37:29.091 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[16].records[0].sid=&quot;s-1-5-21-4076072684-3337085050-2082643766-1001&quot;; artifacts[16].records[0].target=&quot;Claude_pzs8sxrjxfjjc&quot;; artifacts[16].records[0].is_package=True; @controlset001\s-1-5-21-4076072684-3337085050-2082643766-1001</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-06</span><span class="match-clock">18:55:26.189 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-06 18:55:26.189 KST</td><td>NTUSER.DAT</td><td>C:\Users\Kwon\NTUSER.DAT</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-USERASSIST-01</span><ul class="readable"><li class="rv-note">Kwon 직접 실행 2회</li><li><span class="rv-field">target</span> = <span class="rv-value">{6D809377-6AF0-444B-8957-A3773F02200E}\WindowsApps\Claude…(총 102자)</span></li><li><span class="rv-field">raw_name</span> = <span class="rv-value">{6Q809377-6NS0-444O-8957-N3773S02200R}\JvaqbjfNccf\Pynhqr…(총 102자)</span></li><li><span class="rv-field">run_count</span> = <span class="rv-value">2</span></li><li class="rv-time">2026-10-06 18:55:26.189 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[18].records[1].target=&quot;{6D809377-6AF0-444B-8957-A3773F02200E}\WindowsApps\Claude…(총 102자)&quot;; artifacts[18].records[1].raw_name=&quot;{6Q809377-6NS0-444O-8957-N3773S02200R}\JvaqbjfNccf\Pynhqr…(총 102자)&quot;; artifacts[18].records[1].run_count=2; @{cebff5cd-ace2-4f4f-9178-9926f41749ea}; 외 1건</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">시각 없음</span></span><span class="match-meta">매칭 4건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>-</td><td>NTUSER.DAT</td><td>C:\Users\Default\NTUSER.DAT</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-ABSENCE-01</span><ul class="readable"><li class="rv-note">UserAssist 없음 — 직접 실행 여부 판정 불가</li><li><span class="rv-field">hive</span> = <span class="rv-value">kape\C\Users\Default\NTUSER.DAT</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[17].records[0].hive=&quot;kape\C\Users\Default\NTUSER.DAT&quot;; @UserAssist</pre></details></td></tr>
+<tr><td>-</td><td>NTUSER.DAT</td><td>C:\Windows\ServiceProfiles\LocalService\NTUSER.DAT</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-ABSENCE-01</span><ul class="readable"><li class="rv-note">UserAssist 없음 — 직접 실행 여부 판정 불가</li><li><span class="rv-field">hive</span> = <span class="rv-value">kape\C\Windows\ServiceProfiles\LocalService\NTUSER.DAT</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[19].records[0].hive=&quot;kape\C\Windows\ServiceProfiles\LocalService\NTUSER.DAT&quot;; @UserAssist</pre></details></td></tr>
+<tr><td>-</td><td>NTUSER.DAT</td><td>C:\Windows\ServiceProfiles\NetworkService\NTUSER.DAT</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-ABSENCE-01</span><ul class="readable"><li class="rv-note">UserAssist 없음 — 직접 실행 여부 판정 불가</li><li><span class="rv-field">hive</span> = <span class="rv-value">kape\C\Windows\ServiceProfiles\NetworkService\NTUSER.DAT</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[20].records[0].hive=&quot;kape\C\Windows\ServiceProfiles\NetworkService\NTUSER.DAT&quot;; @UserAssist</pre></details></td></tr>
+<tr><td>-</td><td>History</td><td>C:\Users\Kwon\AppData\Local\Microsoft\Edge\User Data\Default\History</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-BROWSER-SEARCH-01</span><ul class="readable"><li class="rv-note">검색어 1종</li><li><span class="rv-field">browser</span> = <span class="rv-value">Edge</span></li><li><span class="rv-field">term</span> = <span class="rv-value">ko</span></li><li><span class="rv-field">state</span> = <span class="rv-value">live</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[26].records[1].browser=&quot;Edge&quot;; artifacts[26].records[1].term=&quot;ko&quot;; artifacts[26].records[1].state=&quot;live&quot;; @page=30 offset=4017</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A02</span> <span class="action-name">로그인</span><span class="summary-meta">매칭 12건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:51.000 (현지)</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:51.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-ACCTLOG-01</span><ul class="readable"><li class="rv-note">계정 정보 수신 4건</li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li><span class="rv-field">message</span> = <span class="rv-value">claude.ai account details provided</span></li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li class="rv-time">2026-10-05 22:05:51.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[10].level=&quot;info&quot;; artifacts[9].records[10].message=&quot;claude.ai account details provided&quot;; @main.log:221; artifacts[9].records[35].level=&quot;info&quot;; artifacts[9].records[35].message=&quot;claude.ai account details provided&quot;; @main.log:802; artifacts[9].records[52].level=&quot;info&quot;; artifact...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:31.000 (현지)</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:31.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-ACCTORG-LOGLINE-01</span><ul class="readable"><li class="rv-note">계정 없음 / 조직 84f1e338-368</li><li><span class="rv-field">account</span> = <span class="rv-value"></span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li><span class="rv-field">message</span> = <span class="rv-value">[LocalAgentModeSessionManager] Cannot initialize sessions…(총 145자)</span></li><li class="rv-time">2026-10-05 22:07:31.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[18].account=&quot;&quot;; artifacts[9].records[18].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; artifacts[9].records[18].message=&quot;[LocalAgentModeSessionManager] Cannot initialize sessions…(총 145자)&quot;; @main.log:746; artifacts[9].records[19].account=&quot;&quot;; artifacts[9].records[19].org=&quot;84f1e3...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:32.490 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:32.490 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-ACCOUNT-SEEN-01</span><ul class="readable"><li class="rv-note">이벤트 197건</li><li><span class="rv-field">event</span> = <span class="rv-value">$identify</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">480e55b8-c900-4d17-a134-96100aaad7f5</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-05 22:07:32.490 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[7].event=&quot;$identify&quot;; artifacts[0].records[7].event_id=&quot;480e55b8-c900-4d17-a134-96100aaad7f5&quot;; artifacts[0].records[7].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000005.ldb+0x130F seq=25 key=antalytics_queue_v1; artifacts[0].records[8].event=&quot;claudeai.desktop.first_login.co...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:34.000 (현지)</span></span><span class="match-meta">매칭 2건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:34.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-SESSLOAD-LOG-01</span><ul class="readable"><li class="rv-note">세션 적재 7건</li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li><span class="rv-field">message</span> = <span class="rv-value">Loaded 0 persisted sessions from C:\Users\Kwon\AppData\Ro…(총 169자)</span></li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li class="rv-time">2026-10-05 22:07:34.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[38].level=&quot;info&quot;; artifacts[9].records[38].message=&quot;Loaded 0 persisted sessions from C:\Users\Kwon\AppData\Ro…(총 169자)&quot;; @main.log:815; artifacts[9].records[55].level=&quot;info&quot;; artifacts[9].records[55].message=&quot;Loaded 0 persisted sessions from C:\Users\Kwon\AppData\Ro…(총 169자)&quot;...</pre></details></td></tr>
+<tr><td>2026-10-05 22:07:34.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-LOGIN-LOGLINE-01</span><ul class="readable"><li class="rv-note">로그인 7612a620-8deb- (clearing)</li><li><span class="rv-field">logged_out_before</span> = <span class="rv-value">True</span></li><li><span class="rv-field">logged_out_after</span> = <span class="rv-value">False</span></li><li><span class="rv-field">uuid_from</span> = <span class="rv-value"></span></li><li class="rv-time">2026-10-05 22:07:34.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[34].logged_out_before=True; artifacts[9].records[34].logged_out_after=False; artifacts[9].records[34].uuid_from=&quot;&quot;; @main.log:799</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:35.334 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:35.334 KST</td><td>plan-usage-history.json</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\plan-usage-history.json</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-ORG-SEEN-01</span><ul class="readable"><li class="rv-note">조직 84f1e338-3681-4143 · 표본 4건</li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li><span class="rv-field">usage</span> = <span class="rv-value">{}</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-05 22:07:35.334 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[10].records[0].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; artifacts[10].records[0].usage={}; @samples[0]; artifacts[10].records[1].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; artifacts[10].records[1].usage={}; @samples[1]; artifacts[10].records[2].org=&quot;84f1e338-3681-4143-87c8-e224a4b8f...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-06</span><span class="match-clock">18:56:18.160 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-06 18:56:18.160 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-PROFILE-01</span><ul class="readable"><li class="rv-note">앱 이벤트 claudeai.desktop.sidebar.profile_menu_opened 2건</li><li><span class="rv-field">event</span> = <span class="rv-value">claudeai.desktop.sidebar.profile_menu_opened</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">8a12a10f-8dec-454c-808e-d4fe733dcbb8</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-06 18:56:18.160 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[190].event=&quot;claudeai.desktop.sidebar.profile_menu_opened&quot;; artifacts[0].records[190].event_id=&quot;8a12a10f-8dec-454c-808e-d4fe733dcbb8&quot;; artifacts[0].records[190].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000010.ldb+0x0 seq=194 key=antalytics_queue_v1; artifacts[0].records[25...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-06</span><span class="match-clock">18:56:21.255 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-06 18:56:21.255 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-SETTINGS-01</span><ul class="readable"><li class="rv-note">앱 이벤트 claudeai.settings.section_viewed 6건</li><li><span class="rv-field">event</span> = <span class="rv-value">claudeai.settings.section_viewed</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">a2159b93-1b74-439c-8910-d7ba1177bf3f</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-06 18:56:21.255 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[193].event=&quot;claudeai.settings.section_viewed&quot;; artifacts[0].records[193].event_id=&quot;a2159b93-1b74-439c-8910-d7ba1177bf3f&quot;; artifacts[0].records[193].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000010.ldb+0x0 seq=194 key=antalytics_queue_v1; artifacts[0].records[194].event=&quot;cl...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">시각 없음</span></span><span class="match-meta">매칭 4건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>-</td><td>7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-IDDIR-01</span><ul class="readable"><li class="rv-note">계정 7612a620-8de / 조직 84f1e338-368 (claude-code-sess·local-agent-mode·skills-plugin)</li><li><span class="rv-field">source_dir</span> = <span class="rv-value">local-agent-mode-sessions</span></li><li><span class="rv-field">account</span> = <span class="rv-value">7612a620-8deb-4893-8ab3-fba8eb0e105d</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[11].records[0].source_dir=&quot;local-agent-mode-sessions&quot;; artifacts[11].records[0].account=&quot;7612a620-8deb-4893-8ab3-fba8eb0e105d&quot;; artifacts[11].records[0].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @local-agent-mode-sessions</pre></details></td></tr>
+<tr><td>-</td><td>7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude-code-sessions\7612a620-8deb-4893-8ab3-fba8eb0e105d</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-IDDIR-01</span><ul class="readable"><li class="rv-note">계정 7612a620-8de / 조직 84f1e338-368 (claude-code-sess·local-agent-mode·skills-plugin)</li><li><span class="rv-field">source_dir</span> = <span class="rv-value">claude-code-sessions</span></li><li><span class="rv-field">account</span> = <span class="rv-value">7612a620-8deb-4893-8ab3-fba8eb0e105d</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[12].records[0].source_dir=&quot;claude-code-sessions&quot;; artifacts[12].records[0].account=&quot;7612a620-8deb-4893-8ab3-fba8eb0e105d&quot;; artifacts[12].records[0].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @claude-code-sessions</pre></details></td></tr>
+<tr><td>-</td><td>84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\local-agent-mode-sessions\skills-plugin\84f1e338-3681-4143-87c8-e224a4b8fd08</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-IDDIR-01</span><ul class="readable"><li class="rv-note">계정 7612a620-8de / 조직 84f1e338-368 (claude-code-sess·local-agent-mode·skills-plugin)</li><li><span class="rv-field">source_dir</span> = <span class="rv-value">skills-plugin</span></li><li><span class="rv-field">account</span> = <span class="rv-value">7612a620-8deb-4893-8ab3-fba8eb0e105d</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[13].records[0].source_dir=&quot;skills-plugin&quot;; artifacts[13].records[0].account=&quot;7612a620-8deb-4893-8ab3-fba8eb0e105d&quot;; artifacts[13].records[0].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @skills-plugin</pre></details></td></tr>
+<tr><td>-</td><td>Cookies</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Network\Cookies</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-SESSION-LIVE-01</span><ul class="readable"><li class="rv-note">세션 쿠키 sessionKey,sessionKeyLC,sessionKeyV3,sessionKeyV3LC 잔존 — 수집 시점에 로그인 상태</li><li><span class="rv-field">host</span> = <span class="rv-value">.claude.ai</span></li><li><span class="rv-field">name</span> = <span class="rv-value">sessionKey</span></li><li><span class="rv-field">kind</span> = <span class="rv-value">session</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[15].records[10].host=&quot;.claude.ai&quot;; artifacts[15].records[10].name=&quot;sessionKey&quot;; artifacts[15].records[10].kind=&quot;session&quot;; @page=5 offset=3457; artifacts[15].records[11].host=&quot;.claude.ai&quot;; artifacts[15].records[11].name=&quot;sessionKeyLC&quot;; artifacts[15].records[11].kind=&quot;session&quot;; @page=5 of...</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A03</span> <span class="action-name">로그아웃</span><span class="summary-meta">매칭 0건</span></summary>
+<div class="action-body">
+<p class="empty">해당 아티팩트 없음</p>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A04</span> <span class="action-name">다중 계정</span><span class="summary-meta">매칭 0건</span></summary>
+<div class="action-body">
+<p class="empty">해당 아티팩트 없음</p>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A05</span> <span class="action-name">새 대화 생성</span><span class="summary-meta">매칭 1건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:33.941 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:33.941 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-NEWCHAT-01</span><ul class="readable"><li class="rv-note">앱 이벤트 claudeai.page.new_chat_input_ready 6건</li><li><span class="rv-field">event</span> = <span class="rv-value">claudeai.page.new_chat_input_ready</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">cc065186-38b5-4c7a-8674-f0fcb73b6de0</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-05 22:07:33.941 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[11].event=&quot;claudeai.page.new_chat_input_ready&quot;; artifacts[0].records[11].event_id=&quot;cc065186-38b5-4c7a-8674-f0fcb73b6de0&quot;; artifacts[0].records[11].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000005.ldb+0x130F seq=25 key=antalytics_queue_v1; artifacts[0].records[42].event=&quot;cl...</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A06</span> <span class="action-name">프롬프트 입력</span><span class="summary-meta">매칭 4건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:24:48.977 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:24:48.977 KST</td><td>conversations.json</td><td>C:\conversations.json</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-UUID7-TIME-01</span><ul class="readable"><li class="rv-note">Customer list summary and  · 메시지 6개</li><li><span class="rv-field">conversation</span> = <span class="rv-value">c3daac0b-1899-4383-b394-e7cb8dcdc25f</span></li><li><span class="rv-field">title</span> = <span class="rv-value">Customer list summary and analysis</span></li><li><span class="rv-field">sender</span> = <span class="rv-value">human</span></li><li class="rv-time">2026-10-05 22:24:48.977 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[28].records[18].conversation=&quot;c3daac0b-1899-4383-b394-e7cb8dcdc25f&quot;; artifacts[28].records[18].title=&quot;Customer list summary and analysis&quot;; artifacts[28].records[18].sender=&quot;human&quot;; @uuid=01a10c3d-08d1-7173-b303-bae791e430b8; artifacts[28].records[19].conversation=&quot;c3daac0b-1899-4383-b39...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:24:49.142 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:24:49.142 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-REVISIT-01</span><ul class="readable"><li class="rv-note">대화를 열었다 c3daac0b-1899-4383</li><li><span class="rv-field">conversation</span> = <span class="rv-value">c3daac0b-1899-4383-b394-e7cb8dcdc25f</span></li><li><span class="rv-field">evictions</span> = <span class="rv-value">0</span></li><li class="rv-time">2026-10-05 22:24:49.142 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[78].conversation=&quot;c3daac0b-1899-4383-b394-e7cb8dcdc25f&quot;; artifacts[0].records[78].evictions=0; @000007.ldb+0x40EF seq=116 key=conversation-revisits-device; 외 6건</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:25:43.373 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:25:43.373 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-REPLY-TIMING-01</span><ul class="readable"><li class="rv-note">응답 수신 — 첫 글자까지 0.9초 · 전체 62.2초</li><li><span class="rv-field">event</span> = <span class="rv-value">claudeai.message.sent</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">654a0488-7178-4c2f-b6e8-58eb11d6e3ba</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-05 22:25:43.373 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[71].event=&quot;claudeai.message.sent&quot;; artifacts[0].records[71].event_id=&quot;654a0488-7178-4c2f-b6e8-58eb11d6e3ba&quot;; artifacts[0].records[71].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000007.ldb+0x268B seq=109 key=antalytics_queue_v1; artifacts[0].records[72].event=&quot;claudeai.messa...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-06</span><span class="match-clock">19:07:49.199 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-06 19:07:49.199 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-REPLY-UUID7-01</span><ul class="readable"><li class="rv-note">발신자미상 메시지 식별자에서 역산</li><li><span class="rv-field">event</span> = <span class="rv-value">claudeai.message.edit_started</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">9726e29d-694a-424e-8645-35d9c7f4b7c8</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-06 19:07:49.199 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[289].event=&quot;claudeai.message.edit_started&quot;; artifacts[0].records[289].event_id=&quot;9726e29d-694a-424e-8645-35d9c7f4b7c8&quot;; artifacts[0].records[289].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000011.log+0x2C1E seq=265 key=antalytics_queue_v1</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A07</span> <span class="action-name">프롬프트 수정</span><span class="summary-meta">매칭 1건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:24:48.026 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:24:48.026 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-DRAFT-SENT-01</span><ul class="readable"><li class="rv-note">전송된 것으로 보인다 — 같은 문구가 대화에 있다</li><li><span class="rv-field">text</span> = <span class="rv-value">S01-T3-01-DEL I am attaching a customer list. Summarize w…(총 119자)</span></li><li><span class="rv-field">chars</span> = <span class="rv-value">119</span></li><li><span class="rv-field">attachments</span> = <span class="rv-value">1</span></li><li class="rv-time">2026-10-05 22:24:48.026 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[62].text=&quot;S01-T3-01-DEL I am attaching a customer list. Summarize w…(총 119자)&quot;; artifacts[0].records[62].chars=119; artifacts[0].records[62].attachments=1; @000007.ldb+0x4C8E seq=106 key=static-composer-draft-data</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A08</span> <span class="action-name">메모리 기능 사용</span><span class="summary-meta">매칭 0건</span></summary>
+<div class="action-body">
+<p class="empty">해당 아티팩트 없음</p>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A09</span> <span class="action-name">파일 업로드</span><span class="summary-meta">매칭 1건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">시각 없음</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>-</td><td>https_claude.ai_0.indexeddb.leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\IndexedDB\https_claude.ai_0.indexeddb.leveldb</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-UPLOAD-LOCALPATH-01</span><ul class="readable"><li class="rv-note">업로드 S01-chart.png</li><li><span class="rv-field">local_path</span> = <span class="rv-value">C:\TestData\S01-chart.png</span></li><li><span class="rv-field">file_name</span> = <span class="rv-value">S01-chart.png</span></li><li><span class="rv-field">store</span> = <span class="rv-value">indexeddb</span></li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[27].records[19].local_path=&quot;C:\TestData\S01-chart.png&quot;; artifacts[27].records[19].file_name=&quot;S01-chart.png&quot;; artifacts[27].records[19].store=&quot;indexeddb&quot;; @000003.log+0x34E4D seq=999; artifacts[27].records[20].local_path=&quot;C:\TestData\S01-chart.png&quot;; artifacts[27].records[20].file_name=&quot;&quot;...</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A10</span> <span class="action-name">파일 다운로드</span><span class="summary-meta">매칭 0건</span></summary>
+<div class="action-body">
+<p class="empty">해당 아티팩트 없음</p>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A11</span> <span class="action-name">대화 삭제</span><span class="summary-meta">매칭 2건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:52.154 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:52.154 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade direct">직접</span></td><td><span class="rule-id">R-DELETE-LEDGER-01</span><ul class="readable"><li class="rv-note">대화 31d99eed-c5ae-4447-b5cf-cb94d96e3823</li><li><span class="rv-field">count</span> = <span class="rv-value">2</span></li><li><span class="rv-field">uuids</span> = <span class="rv-value">[&quot;31d99eed-c5ae-4447-b5cf-cb94d96e3823&quot;, &quot;6c6abbde-88d9-4…(총 80자)</span></li><li><span class="rv-field">deleted</span> = <span class="rv-value">[&quot;31d99eed-c5ae-4447-b5cf-cb94d96e3823&quot;, &quot;6c6abbde-88d9-4…(총 80자)</span></li><li class="rv-time">2026-10-05 22:07:52.154 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[31].count=2; artifacts[0].records[31].uuids=[&quot;31d99eed-c5ae-4447-b5cf-cb94d96e3823&quot;, &quot;6c6abbde-88d9-4…(총 80자); artifacts[0].records[31].deleted=[&quot;31d99eed-c5ae-4447-b5cf-cb94d96e3823&quot;, &quot;6c6abbde-88d9-4…(총 80자); @000005.ldb+0x241D seq=67 key=claude-conversation-ledger; artifac...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">시각 없음</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>-</td><td>-</td><td>-</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-ABSENCE-01</span><ul class="readable"><li class="rv-note">대화 3ff12bd1-f0ce-4cf9-8d16-0e52dad305df — 삭제 여부 판정 불가</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>대화 3ff12bd1-f0ce-4cf9-8d16-0e52dad305df — 삭제 여부 판정 불가</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A12</span> <span class="action-name">계정 삭제</span><span class="summary-meta">매칭 0건</span></summary>
+<div class="action-body">
+<p class="empty">해당 아티팩트 없음</p>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A13</span> <span class="action-name">임시 채팅</span><span class="summary-meta">매칭 0건</span></summary>
+<div class="action-body">
+<p class="empty">해당 아티팩트 없음</p>
+</div></details>
+<details class="action">
+<summary><span class="action-id">A14</span> <span class="action-name">플러그인 사용</span><span class="summary-meta">매칭 4건</span></summary>
+<div class="action-body">
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:05:46.000 (현지)</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:05:46.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-MCPCONF-LOG-01</span><ul class="readable"><li class="rv-note">MCP 설정 읽음 4건</li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li><span class="rv-field">message</span> = <span class="rv-value">claude_desktop_config.json not found. On MSIX installs, c…(총 180자)</span></li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li class="rv-time">2026-10-05 22:05:46.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[1].level=&quot;info&quot;; artifacts[9].records[1].message=&quot;claude_desktop_config.json not found. On MSIX installs, c…(총 180자)&quot;; @main.log:9; artifacts[9].records[17].level=&quot;info&quot;; artifacts[9].records[17].message=&quot;Reading claude_desktop_config.json from C:\Users\Kwon\App…(총 150자)&quot;; @m...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:33.000 (현지)</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:33.000 (현지)</td><td>main.log</td><td>C:\Users\Kwon\AppData\Local\Claude\logs\main.log</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-OAUTHFAIL-LOG-01</span><ul class="readable"><li class="rv-note">OAuth 실패 12건</li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li><span class="rv-field">message</span> = <span class="rv-value">oauth failed: authorize returned 403 &lt;json error=permissi…(총 74자)</span></li><li><span class="rv-field">level</span> = <span class="rv-value">info</span></li><li class="rv-time">2026-10-05 22:07:33.000 (현지)</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[9].records[24].level=&quot;info&quot;; artifacts[9].records[24].message=&quot;oauth failed: authorize returned 403 &lt;json error=permissi…(총 74자)&quot;; @main.log:774; artifacts[9].records[41].level=&quot;info&quot;; artifacts[9].records[41].message=&quot;oauth failed: authorize returned 403 &lt;json error=permissi…(총 74자)&quot;; ...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:34.170 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:34.170 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-CONNECTOR-01</span><ul class="readable"><li class="rv-note">앱 이벤트 mcp.servers.listed 4건</li><li><span class="rv-field">event</span> = <span class="rv-value">mcp.servers.listed</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">99ab328f-9a5c-469f-95cd-3fdf8fd9d916</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-05 22:07:34.170 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[13].event=&quot;mcp.servers.listed&quot;; artifacts[0].records[13].event_id=&quot;99ab328f-9a5c-469f-95cd-3fdf8fd9d916&quot;; artifacts[0].records[13].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000005.ldb+0x130F seq=25 key=antalytics_queue_v1; artifacts[0].records[17].event=&quot;mcp.servers.listed...</pre></details></td></tr>
+</tbody></table></div></details>
+<details class="match"><summary><span class="match-time"><span class="match-date">2026-10-05</span><span class="match-clock">22:07:35.154 KST</span></span><span class="match-meta">매칭 1건</span></summary>
+<div class="match-body table-wrap"><table>
+<thead><tr><th>시각</th><th>아티팩트</th><th>경로</th><th>등급</th><th>근거</th></tr></thead>
+<tbody>
+<tr><td>2026-10-05 22:07:35.154 KST</td><td>leveldb</td><td>C:\Users\Kwon\AppData\Local\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\Local Storage\leveldb</td><td><span class="grade supporting">보조</span></td><td><span class="rule-id">R-CONNECTOR-02</span><ul class="readable"><li class="rv-note">앱 이벤트 claudeai.mcp.bootstrap_stream.completed 3건</li><li><span class="rv-field">event</span> = <span class="rv-value">claudeai.mcp.bootstrap_stream.completed</span></li><li><span class="rv-field">event_id</span> = <span class="rv-value">b4f12b51-bfa2-4738-8679-b9b8d2ec7f4b</span></li><li><span class="rv-field">org</span> = <span class="rv-value">84f1e338-3681-4143-87c8-e224a4b8fd08</span></li><li class="rv-time">2026-10-05 22:07:35.154 KST</li></ul><details class="raw"><summary>원본 근거 보기</summary><pre>artifacts[0].records[16].event=&quot;claudeai.mcp.bootstrap_stream.completed&quot;; artifacts[0].records[16].event_id=&quot;b4f12b51-bfa2-4738-8679-b9b8d2ec7f4b&quot;; artifacts[0].records[16].org=&quot;84f1e338-3681-4143-87c8-e224a4b8fd08&quot;; @000005.ldb+0x130F seq=25 key=antalytics_queue_v1; artifacts[0].records[43].even...</pre></details></td></tr>
+</tbody></table></div></details>
+</div></details>
+</section>
+</div>
+<div data-view="rules" hidden>
+<section class="appendix">
+<h2>부록: 판정 규칙</h2>
+<div class="table-wrap"><table>
+<thead><tr><th>규칙 ID</th><th>행위</th><th>아티팩트</th><th>필터</th><th>시각 필드</th><th>비고</th></tr></thead><tbody>
+<tr><td class="mono">R-INSTALL-ORDER-01</td><td>A00 설치</td><td>Claude, Claude_2.2553.1.0_x64__pzs8sxrjxfjjc, Claude_pzs8sxrjxfjjc</td><td class="mono">stage=패키지 등록; entry=198492; seq=3</td><td>직접 / 4건</td><td>설치 4단계 순서 정상</td></tr>
+<tr><td class="mono">R-ABSENCE-01</td><td>A01 실행</td><td>NTUSER.DAT</td><td class="mono">hive=kape\C\Users\Default\NTUSER.DAT; hive=kape\C\Windows\ServiceProfiles\LocalService\NTUSER.DAT; hive=kape\C\Windows\ServiceProfiles\NetworkService\NTUSER.DAT</td><td>보조 / 3건</td><td>UserAssist 없음 — 직접 실행 여부 판정 불가</td></tr>
+<tr><td class="mono">R-APPSTART-LOG-01</td><td>A01 실행</td><td>main.log</td><td class="mono">level=info; message=Starting app {</td><td>보조 / 1건</td><td>앱 기동 4건</td></tr>
+<tr><td class="mono">R-BAM-SID-01</td><td>A01 실행</td><td>SYSTEM</td><td class="mono">sid=s-1-5-21-4076072684-3337085050-2082643766-1001; target=Claude_pzs8sxrjxfjjc; is_package=True</td><td>직접 / 1건</td><td>SID 2643766-1001 · 대상 1개</td></tr>
+<tr><td class="mono">R-BROWSER-SEARCH-01</td><td>A01 실행</td><td>History</td><td class="mono">browser=Edge; term=ko; state=live</td><td>직접 / 1건</td><td>검색어 1종</td></tr>
+<tr><td class="mono">R-BROWSER-VISIT-01</td><td>A01 실행</td><td>History</td><td class="mono">browser=Edge; url=https://claude.ai/; title=</td><td>직접 / 1건</td><td>AI 서비스 방문 16건</td></tr>
+<tr><td class="mono">R-FIRSTRUN-01</td><td>A01 실행</td><td>leveldb</td><td class="mono">version=2.2553.1; docs=1</td><td>직접 / 1건</td><td>앱 버전 2.2553.1</td></tr>
+<tr><td class="mono">R-PAGELOAD-LOG-01</td><td>A01 실행</td><td>main.log</td><td class="mono">level=info; message=Loaded https://claude.ai (web commit aa6da7d0d3a86c1fc9a5…(총 135자)</td><td>보조 / 1건</td><td>claude.ai 로드 3건</td></tr>
+<tr><td class="mono">R-RUN-PF-01</td><td>A01 실행</td><td>CLAUDE.EXE-0659240F.pf, CLAUDE.EXE-06592410.pf, CLAUDE.EXE-06592411.pf 외 5</td><td class="mono">name=CLAUDE.EXE; hash=06592413; run_count=4</td><td>직접 / 8건</td><td>CLAUDE.EXE [메인] 실행 4회 · 시각 4개</td></tr>
+<tr><td class="mono">R-USERASSIST-01</td><td>A01 실행</td><td>NTUSER.DAT</td><td class="mono">target={6D809377-6AF0-444B-8957-A3773F02200E}\WindowsApps\Claude…(총 102자); raw_name={6Q809377-6NS0-444O-8957-N3773S02200R}\JvaqbjfNccf\Pynhqr…(총 102자); run_count=2</td><td>직접 / 1건</td><td>Kwon 직접 실행 2회</td></tr>
+<tr><td class="mono">R-ACCOUNT-SEEN-01</td><td>A02 로그인</td><td>leveldb</td><td class="mono">event=$identify; event_id=480e55b8-c900-4d17-a134-96100aaad7f5; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>직접 / 1건</td><td>이벤트 197건</td></tr>
+<tr><td class="mono">R-ACCTLOG-01</td><td>A02 로그인</td><td>main.log</td><td class="mono">level=info; message=claude.ai account details provided</td><td>보조 / 1건</td><td>계정 정보 수신 4건</td></tr>
+<tr><td class="mono">R-ACCTORG-LOGLINE-01</td><td>A02 로그인</td><td>main.log</td><td class="mono">account=; org=84f1e338-3681-4143-87c8-e224a4b8fd08; message=[LocalAgentModeSessionManager] Cannot initialize sessions…(총 145자)</td><td>보조 / 1건</td><td>계정 없음 / 조직 84f1e338-368</td></tr>
+<tr><td class="mono">R-IDDIR-01</td><td>A02 로그인</td><td>7612a620-8deb-4893-8ab3-fba8eb0e105d, 84f1e338-3681-4143-87c8-e224a4b8fd08</td><td class="mono">source_dir=local-agent-mode-sessions; account=7612a620-8deb-4893-8ab3-fba8eb0e105d; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>직접 / 3건</td><td>계정 7612a620-8de / 조직 84f1e338-368 (claude-code-sess·local-agent-mode·skills-plugin)</td></tr>
+<tr><td class="mono">R-LOGIN-LOGLINE-01</td><td>A02 로그인</td><td>main.log</td><td class="mono">logged_out_before=True; logged_out_after=False; uuid_from=</td><td>보조 / 1건</td><td>로그인 7612a620-8deb- (clearing)</td></tr>
+<tr><td class="mono">R-ORG-SEEN-01</td><td>A02 로그인</td><td>plan-usage-history.json</td><td class="mono">org=84f1e338-3681-4143-87c8-e224a4b8fd08; usage={}</td><td>직접 / 1건</td><td>조직 84f1e338-3681-4143 · 표본 4건</td></tr>
+<tr><td class="mono">R-PROFILE-01</td><td>A02 로그인</td><td>leveldb</td><td class="mono">event=claudeai.desktop.sidebar.profile_menu_opened; event_id=8a12a10f-8dec-454c-808e-d4fe733dcbb8; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>보조 / 1건</td><td>앱 이벤트 claudeai.desktop.sidebar.profile_menu_opened 2건</td></tr>
+<tr><td class="mono">R-SESSION-LIVE-01</td><td>A02 로그인</td><td>Cookies</td><td class="mono">host=.claude.ai; name=sessionKey; kind=session</td><td>직접 / 1건</td><td>세션 쿠키 sessionKey,sessionKeyLC,sessionKeyV3,sessionKeyV3LC 잔존 — 수집 시점에 로그인 상태</td></tr>
+<tr><td class="mono">R-SESSLOAD-LOG-01</td><td>A02 로그인</td><td>main.log</td><td class="mono">level=info; message=Loaded 0 persisted sessions from C:\Users\Kwon\AppData\Ro…(총 169자)</td><td>보조 / 1건</td><td>세션 적재 7건</td></tr>
+<tr><td class="mono">R-SETTINGS-01</td><td>A02 로그인</td><td>leveldb</td><td class="mono">event=claudeai.settings.section_viewed; event_id=a2159b93-1b74-439c-8910-d7ba1177bf3f; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>보조 / 1건</td><td>앱 이벤트 claudeai.settings.section_viewed 6건</td></tr>
+<tr><td class="mono">R-NEWCHAT-01</td><td>A05 새 대화 생성</td><td>leveldb</td><td class="mono">event=claudeai.page.new_chat_input_ready; event_id=cc065186-38b5-4c7a-8674-f0fcb73b6de0; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>보조 / 1건</td><td>앱 이벤트 claudeai.page.new_chat_input_ready 6건</td></tr>
+<tr><td class="mono">R-REPLY-TIMING-01</td><td>A06 프롬프트 입력</td><td>leveldb</td><td class="mono">event=claudeai.message.sent; event_id=654a0488-7178-4c2f-b6e8-58eb11d6e3ba; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>직접 / 1건</td><td>응답 수신 — 첫 글자까지 0.9초 · 전체 62.2초</td></tr>
+<tr><td class="mono">R-REPLY-UUID7-01</td><td>A06 프롬프트 입력</td><td>leveldb</td><td class="mono">event=claudeai.message.edit_started; event_id=9726e29d-694a-424e-8645-35d9c7f4b7c8; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>직접 / 1건</td><td>발신자미상 메시지 식별자에서 역산</td></tr>
+<tr><td class="mono">R-REVISIT-01</td><td>A06 프롬프트 입력</td><td>leveldb</td><td class="mono">conversation=c3daac0b-1899-4383-b394-e7cb8dcdc25f; evictions=0</td><td>보조 / 1건</td><td>대화를 열었다 c3daac0b-1899-4383</td></tr>
+<tr><td class="mono">R-UUID7-TIME-01</td><td>A06 프롬프트 입력</td><td>conversations.json</td><td class="mono">conversation=c3daac0b-1899-4383-b394-e7cb8dcdc25f; title=Customer list summary and analysis; sender=human</td><td>직접 / 1건</td><td>Customer list summary and  · 메시지 6개</td></tr>
+<tr><td class="mono">R-DRAFT-SENT-01</td><td>A07 프롬프트 수정</td><td>leveldb</td><td class="mono">text=S01-T3-01-DEL I am attaching a customer list. Summarize w…(총 119자); chars=119; attachments=1</td><td>보조 / 1건</td><td>전송된 것으로 보인다 — 같은 문구가 대화에 있다</td></tr>
+<tr><td class="mono">R-UPLOAD-LOCALPATH-01</td><td>A09 파일 업로드</td><td>https_claude.ai_0.indexeddb.leveldb</td><td class="mono">local_path=C:\TestData\S01-chart.png; file_name=S01-chart.png; store=indexeddb</td><td>직접 / 1건</td><td>업로드 S01-chart.png</td></tr>
+<tr><td class="mono">R-ABSENCE-01</td><td>A11 대화 삭제</td><td>-</td><td class="mono">-</td><td>보조 / 1건</td><td>대화 3ff12bd1-f0ce-4cf9-8d16-0e52dad305df — 삭제 여부 판정 불가</td></tr>
+<tr><td class="mono">R-DELETE-LEDGER-01</td><td>A11 대화 삭제</td><td>leveldb</td><td class="mono">count=2; uuids=[&quot;31d99eed-c5ae-4447-b5cf-cb94d96e3823&quot;, &quot;6c6abbde-88d9-4…(총 80자); deleted=[&quot;31d99eed-c5ae-4447-b5cf-cb94d96e3823&quot;, &quot;6c6abbde-88d9-4…(총 80자)</td><td>직접 / 1건</td><td>대화 31d99eed-c5ae-4447-b5cf-cb94d96e3823</td></tr>
+<tr><td class="mono">R-CONNECTOR-01</td><td>A14 플러그인 사용</td><td>leveldb</td><td class="mono">event=mcp.servers.listed; event_id=99ab328f-9a5c-469f-95cd-3fdf8fd9d916; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>보조 / 1건</td><td>앱 이벤트 mcp.servers.listed 4건</td></tr>
+<tr><td class="mono">R-CONNECTOR-02</td><td>A14 플러그인 사용</td><td>leveldb</td><td class="mono">event=claudeai.mcp.bootstrap_stream.completed; event_id=b4f12b51-bfa2-4738-8679-b9b8d2ec7f4b; org=84f1e338-3681-4143-87c8-e224a4b8fd08</td><td>보조 / 1건</td><td>앱 이벤트 claudeai.mcp.bootstrap_stream.completed 3건</td></tr>
+<tr><td class="mono">R-MCPCONF-LOG-01</td><td>A14 플러그인 사용</td><td>main.log</td><td class="mono">level=info; message=claude_desktop_config.json not found. On MSIX installs, c…(총 180자)</td><td>보조 / 1건</td><td>MCP 설정 읽음 4건</td></tr>
+<tr><td class="mono">R-OAUTHFAIL-LOG-01</td><td>A14 플러그인 사용</td><td>main.log</td><td class="mono">level=info; message=oauth failed: authorize returned 403 &lt;json error=permissi…(총 74자)</td><td>보조 / 1건</td><td>OAuth 실패 12건</td></tr>
+</tbody></table></div>
+</section>
+</div>
+</main>
+</div>
+<script>
+const views = Array.from(document.querySelectorAll('[data-view]'));
+for (const button of document.querySelectorAll('[data-view-button]')) {
+  button.addEventListener('click', () => {
+    const sel = button.dataset.viewButton;
+    for (const v of views) v.hidden = v.dataset.view !== sel;
+    for (const nav of document.querySelectorAll('[data-view-button]')) {
+      nav.classList.toggle('active', nav === button);
+      nav.setAttribute('aria-selected', nav === button ? 'true' : 'false');
+    }
+  });
+}
+const search = document.getElementById('search');
+const actions = Array.from(document.querySelectorAll('details.action'));
+function filterActions() {
+  const q = search.value.trim().toLocaleLowerCase();
+  for (const action of actions) {
+    const hitName = action.querySelector('.action-name')
+      .textContent.toLocaleLowerCase().includes(q);
+    let visible = 0;
+    for (const match of action.querySelectorAll('details.match')) {
+      let rows = 0;
+      for (const row of match.querySelectorAll('tbody tr')) {
+        const hit = !q || hitName ||
+          row.textContent.toLocaleLowerCase().includes(q);
+        row.hidden = !hit;
+        if (hit) rows++;
+      }
+      match.hidden = rows === 0;
+      visible += rows;
+    }
+    action.hidden = visible === 0;
+  }
+}
+search.addEventListener('input', filterActions);
+function setAll(open) {
+  for (const d of document.querySelectorAll('details.action, details.match'))
+    d.open = open;
+}
+document.getElementById('expand').addEventListener('click', () => setAll(true));
+document.getElementById('collapse').addEventListener('click',
+  () => setAll(false));
+</script>
+</body></html>
