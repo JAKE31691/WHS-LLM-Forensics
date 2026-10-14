@@ -1,0 +1,4 @@
+# Python 3.12 x64. Shared acquisition and the original desktop parsers.
+-r ../chatgpt_app/requirements.txt
+Brotli>=1.1
+zstandard
