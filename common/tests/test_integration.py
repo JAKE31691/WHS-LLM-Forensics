@@ -2,6 +2,7 @@
 import fnmatch
 import hashlib
 import json
+import os
 from pathlib import Path
 import sqlite3
 import subprocess
@@ -109,6 +110,42 @@ def test_export_preserves_hashes_paths_and_failures(mixed, tmp_path):
             assert item["collected_path"].startswith("D/Users/")
             assert hashlib.sha256(z.read(item["collected_path"])).hexdigest() == item["sha256"]
     assert len(selected["files"]) == 2
+
+
+def test_target_warnings_exclude_other_environment(tmp_path):
+    root = tmp_path / "files"
+    item = record(root, r"C:\Users\u\.codex\auth.json", b"{}", ["login_auth"])
+    doc = manifest([item])
+    doc["warnings"] = [
+        "artifact not found: Prefetch (ChatGPT installer.exe) (%SYSTEMDRIVE%\\Windows\\Prefetch\\*.pf)",
+        "artifact not found: Claude Desktop application data (%LOCALAPPDATA%\\Claude)",
+        "E01 volume has no verified drive letter; skipped",
+    ]
+    stage = tmp_path / "stage"
+    selected = a.export_environment(root, doc, "chatgpt_app", stage)
+    warnings = selected["warnings"]
+    assert len(warnings) == 2
+    assert "Prefetch (ChatGPT installer.exe)" in warnings[0]
+    assert warnings[1].startswith("E01 volume")
+    assert json.loads((stage / "_collection_manifest.json").read_text(encoding="utf-8"))["warnings"] == warnings
+
+
+def test_archive_clamps_pre_1980_zip_time_without_changing_evidence(tmp_path):
+    root = tmp_path / "files"
+    item = record(root, r"C:\Users\u\.codex\auth.json", b"old timestamp", ["login_auth"])
+    original = root / item["collected_path"]
+    old_ns = 157766400 * 1_000_000_000  # 1975-01-01 UTC
+    os.utime(original, ns=(old_ns, old_ns))
+    before = original.stat().st_mtime_ns
+    item["mtime_ns_before"] = before
+    archive_path = tmp_path / "collected_artifacts.zip"
+    a.write_archive(root, archive_path, manifest([item]))
+    assert original.stat().st_mtime_ns == before
+    with zipfile.ZipFile(archive_path) as archive:
+        assert archive.getinfo(item["collected_path"]).date_time[0] == 1980
+        assert archive.read(item["collected_path"]) == b"old timestamp"
+        stored = json.loads(archive.read("_collection_manifest.json"))
+    assert stored["files"][0]["mtime_ns_before"] == before
 
 
 def test_claude_app_does_not_receive_browser_local_storage(tmp_path):
@@ -293,8 +330,12 @@ def test_rejects_unsafe_archive_paths(tmp_path, path):
 def test_native_worker_outputs(name, mixed, tmp_path):
     root, doc = mixed
     if name == "chatgpt_app":
-        doc["files"].append(record(root, r"D:\Users\fixture-user\.codex\.codex-global-state.json",
-            b'{"desktop-first-seen-at-ms": 1700000000000}', ["run_global_state"]))
+        item = record(root, r"D:\Users\fixture-user\.codex\.codex-global-state.json",
+            b'{"desktop-first-seen-at-ms": 1700000000000}', ["run_global_state"])
+        doc["files"].append(item)
+        evidence = root / item["collected_path"]
+        os.utime(evidence, ns=(157766400 * 1_000_000_000,) * 2)
+        item["mtime_ns_before"] = evidence.stat().st_mtime_ns
     elif name == "chatgpt_web":
         doc["files"].append(record(root,
             r"D:\Users\fixture-user\AppData\Local\Google\Chrome\User Data\Profile 2\Network\Cookies",
@@ -305,7 +346,6 @@ def test_native_worker_outputs(name, mixed, tmp_path):
     context.write_text(json.dumps({"source": "fixture.E01", "source_type": "E01", "detection": {}}), encoding="utf-8")
     output = tmp_path / "results" / name
     output.parent.mkdir(exist_ok=True)
-    import os
     result = subprocess.run([sys.executable, str(COMMON / "worker.py"), name, str(stage), str(output), str(context)],
         env=dict(os.environ, PYTHONUTF8="1", PYTHONIOENCODING="utf-8"), capture_output=True, text=True, encoding="utf-8", errors="replace")
     expected = set(FOUR_FILES)

@@ -231,6 +231,30 @@ def belongs(record, environment):
         any(name == base or name.startswith(base + "-") for base in ("history", "cookies")))
 
 
+def warnings_for_environment(manifest, environment):
+    """Keep source diagnostics and only this target's missing definitions."""
+    labels = set()
+    for definition in collection_definitions():
+        identifier = definition.id
+        if environment == "chatgpt_app":
+            relevant = not identifier.startswith("_common_")
+        elif environment in ("chatgpt_web", "claude_web"):
+            relevant = identifier.startswith("_common_browser_")
+        else:
+            relevant = identifier.startswith(("_common_claude_", "_common_browser_files"))
+        if relevant:
+            labels.add(definition.artifact)
+    selected = []
+    for warning in manifest.get("warnings", []):
+        prefix = "artifact not found: "
+        if warning.startswith(prefix):
+            if not any(warning.startswith(prefix + label + " (")
+                       for label in labels):
+                continue
+        selected.append(warning)
+    return selected
+
+
 def export_environment(root, manifest, environment, destination):
     destination.mkdir(parents=True, exist_ok=False)
     selected = []
@@ -249,14 +273,19 @@ def export_environment(root, manifest, environment, destination):
             # Real copies: native SQLite parsers may use journal sidecars. Never
             # hard-link the shared snapshot or originals into writable parsers.
             shutil.copy2(member_path(root, record["collected_path"]), target)
-    document = dict(manifest, files=selected)
+    document = dict(manifest, files=selected,
+                    warnings=warnings_for_environment(manifest, environment))
     (destination / "_collection_manifest.json").write_text(
         json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
     return document
 
 
 def write_archive(stage, destination, manifest):
-    with zipfile.ZipFile(destination, "x", zipfile.ZIP_DEFLATED) as archive:
+    # ZIP's DOS entry time starts in 1980. E01/NTFS timestamps can be older;
+    # zipfile clamps only its entry timestamp while the manifest keeps the raw
+    # source time and the staged file is never changed.
+    with zipfile.ZipFile(destination, "x", zipfile.ZIP_DEFLATED,
+                         strict_timestamps=False) as archive:
         for record in manifest["files"]:
             if record.get("status") == "ok":
                 path = member_path(stage, record["collected_path"])
