@@ -194,6 +194,10 @@ def test_full_mixed_run_publishes_only_the_two_selected_environments(mixed, tmp_
     separator = console.index("=" * 72, first)
     second = console.index("  Claude Desktop", separator)
     assert first < separator < second
+    web_output = console[first:separator]
+    assert "Files found          : 2" in web_output
+    assert "Files extracted      : 2" in web_output
+    assert "Files extracted      : N/A" not in web_output
     assert console.count("Total execution time:") >= 2
     assert console.startswith("LLM Artifact Analyzer v1.0.0\nAuthor: jbsquad")
     assert console.count("\nTarget:\n") == 2
@@ -291,6 +295,10 @@ def test_native_worker_outputs(name, mixed, tmp_path):
     if name == "chatgpt_app":
         doc["files"].append(record(root, r"D:\Users\fixture-user\.codex\.codex-global-state.json",
             b'{"desktop-first-seen-at-ms": 1700000000000}', ["run_global_state"]))
+    elif name == "chatgpt_web":
+        doc["files"].append(record(root,
+            r"D:\Users\fixture-user\AppData\Local\Google\Chrome\User Data\Profile 2\Network\Cookies",
+            b"", ["_common_browser_files"], failed=True))
     stage = tmp_path / name
     a.export_environment(root, doc, name, stage)
     context = tmp_path / "context.json"
@@ -310,6 +318,9 @@ def test_native_worker_outputs(name, mixed, tmp_path):
     parsed = json.loads((output / "parsed_artifacts.json").read_text(encoding="utf-8"))
     assert parsed["integration"]["source"] == "fixture.E01"
     if name == "chatgpt_web":
+        assert "Files found          : 3" in result.stdout
+        assert "Files extracted      : 2" in result.stdout
+        assert "Extraction failures  : 1" in result.stdout
         assert not parsed["parser_diagnostics"], result.stdout + result.stderr
         assert any(r["source_artifact"] == "history" for r in parsed["records"])
         assert all(r["source_path"].startswith("D:\\Users\\") for r in parsed["records"])

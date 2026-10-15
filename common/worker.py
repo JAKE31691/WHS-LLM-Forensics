@@ -197,6 +197,20 @@ def run_chatgpt_web(stage, output, manifest, context):
                                Path(context["source"]), output,
                                context["source"] == "live")
     reporter.print_header()
+    # The native web analyzer sees a collected directory, so its preparation
+    # event has no acquisition object. Supply the actual shared-collector
+    # counts for this environment to its existing CLI reporter.
+    shared_acquisition = {
+        "files_found": len(manifest["files"]),
+        "files_written": sum(entry.get("status") == "ok" for entry in manifest["files"]),
+        "problem_count": sum(entry.get("status") != "ok" for entry in manifest["files"]),
+    }
+
+    def report_progress(payload):
+        if payload.get("event") == "source_preparation_completed":
+            payload = dict(payload, acquisition=shared_acquisition)
+        reporter(payload)
+
     original_parsers = native.run_profile_parsers
     diagnostics = []
 
@@ -216,7 +230,7 @@ def run_chatgpt_web(stage, output, manifest, context):
 
     native.run_profile_parsers = parse_collected
     result = native.run_team_share_only("chatgpt_web", str(output), input_root=str(stage),
-        progress=reporter,
+        progress=report_progress,
         source_context={"source": context["source"], "requested_source": context["source"],
                         "source_type": context["source_type"]})
     path = output / "parsed_artifacts.json"
