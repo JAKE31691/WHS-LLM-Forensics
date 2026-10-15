@@ -195,6 +195,26 @@ def test_full_mixed_run_publishes_only_the_two_selected_environments(mixed, tmp_
     second = console.index("  Claude Desktop", separator)
     assert first < separator < second
     assert console.count("Total execution time:") >= 2
+    assert console.startswith("LLM Artifact Analyzer v1.0.0\nAuthor: jbsquad")
+    assert console.count("\nTarget:\n") == 2
+    assert "Environment detection:" not in console
+    assert "ActTrace — integrated artifact analyzer" not in console
+    assert "Analyzing chatgpt_web ->" not in console
+    assert ".actrace-" not in console
+
+
+def test_native_cli_section_uses_published_paths(tmp_path):
+    destination = tmp_path / "claude_app"
+    temporary = tmp_path / ".actrace-fixture"
+    raw = ("ActTrace v1.4.0\nSource info:\n  Source: fixture.E01\n"
+           "Target:\n  Claude Desktop (msix)\nLoading artifact definitions...\n"
+           f"Generating CSV report...\n  {temporary / 'LLM_Artifact_Report.csv'}\n"
+           "Total execution time: 1.25 sec\nActTrace extra epilogue\n")
+    section = integrated.native_cli_section(raw, destination)
+    assert section.startswith("Loading artifact definitions...")
+    assert str(destination / "LLM_Artifact_Report.csv") in section
+    assert ".actrace-fixture" not in section
+    assert section.endswith("Total execution time: 1.25 sec")
 
 
 def test_refuses_changed_snapshot_archive(mixed, tmp_path):
