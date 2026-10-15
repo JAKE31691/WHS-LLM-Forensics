@@ -13,6 +13,7 @@ import re
 import shutil
 import sys
 import tempfile
+import time
 
 from acquisition import REPOSITORY, member_path, write_archive
 
@@ -118,6 +119,7 @@ def append_collection_info(output, manifest, context):
 
 
 def run_chatgpt_app(stage, output, manifest, context):
+    started = time.perf_counter()
     sys.path.insert(0, str(REPOSITORY / "chatgpt_app"))
     from parsers import parse_artifacts
     from action_rules import (detect_confirmed_observations, link_confirmed_observations,
@@ -128,10 +130,31 @@ def run_chatgpt_app(stage, output, manifest, context):
     spec = importlib.util.spec_from_file_location("chatgpt_native_cli", REPOSITORY / "chatgpt_app" / "main.py")
     native = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(native)
+    from collect import CollectionSummary
+    native.print_run_info(context["source_type"], context["source"], output)
+    definitions = {definition.id: definition.artifact
+                   for definition in native.ARTIFACT_DEFINITIONS}
+    per_artifact = {}
+    for entry in manifest["files"]:
+        for artifact in {definitions[identifier]
+                         for identifier in (*entry.get("definition_ids", []),
+                                            *entry.get("companion_for", []))
+                         if identifier in definitions}:
+            per_artifact[artifact] = per_artifact.get(artifact, 0) + 1
+    native.print_collection_summary(CollectionSummary(
+        found=len(manifest["files"]),
+        extracted=sum(entry.get("status") == "ok" for entry in manifest["files"]),
+        failures=sum(entry.get("status") != "ok" for entry in manifest["files"]),
+        warnings=manifest.get("warnings", []), per_artifact=per_artifact))
     write_archive(stage, output / FOUR_FILES[0], manifest)
     counts = parse_artifacts(output / FOUR_FILES[0], output / FOUR_FILES[1])
     parsed = json.loads((output / FOUR_FILES[1]).read_text(encoding="utf-8"))
+    print("Artifact parsing:")
+    print(f"  Output              : {output / FOUR_FILES[1]}")
+    for status, count in counts.items():
+        print(f"  {status:19}: {count}")
     native.print_parsing_diagnostics(parsed)
+    print()
     analysis = link_confirmed_observations(parsed, detect_confirmed_observations(parsed))
     for rejected in analysis.rejected:
         print(f"Warning: {rejected}")
@@ -140,11 +163,25 @@ def run_chatgpt_app(stage, output, manifest, context):
         *rows_for_missing_logout(manifest)))
     actions, direct, supporting = native.print_action_summary(rows)
     count = write_csv_report(output / FOUR_FILES[2], rows)
+    print("Generating CSV report...")
+    print(f"  {output / FOUR_FILES[2]}")
+    print("  Status: OK\n")
     html_count = write_html_report(output / FOUR_FILES[3], rows,
         source_type=context["source_type"], actions_detected=actions,
         direct_evidence_count=direct, supporting_evidence_count=supporting)
     if count != html_count:
         raise ValueError("CSV and HTML row counts differ")
+    print("Generating HTML report...")
+    print(f"  {output / FOUR_FILES[3]}")
+    print("  Status: OK\n")
+    print("Execution summary:")
+    print(f"  Target              : {native.TARGET}")
+    print(f"  Artifact definitions : {len(native.COLLECTION_ARTIFACTS)}")
+    print(f"  Files found          : {len(manifest['files'])}")
+    print(f"  Files extracted      : {sum(entry.get('status') == 'ok' for entry in manifest['files'])}")
+    print(f"  Actions detected     : {actions}")
+    print(f"  Failed               : {sum(entry.get('status') != 'ok' for entry in manifest['files']) + counts.get('failed', 0)}")
+    print(f"\nTotal execution time: {time.perf_counter() - started:.2f} sec")
     return int(bool(counts.get("failed") or counts.get("collection_failed")))
 
 
@@ -152,7 +189,14 @@ def run_chatgpt_web(stage, output, manifest, context):
     # Explicit source selection: the repository's final ChatGPT Web version.
     sys.path.insert(0, str(REPOSITORY / "chatgpt_web" / "LLMTrace_최종본"))
     from llmtrace.core import team_share_only as native
+    from llmtrace.cli_output import ConsoleReporter
+    from llmtrace.core.profile import load_profile
     from dataclasses import asdict
+    started = time.perf_counter()
+    reporter = ConsoleReporter(load_profile("chatgpt_web"), context["source"],
+                               Path(context["source"]), output,
+                               context["source"] == "live")
+    reporter.print_header()
     original_parsers = native.run_profile_parsers
     diagnostics = []
 
@@ -172,6 +216,7 @@ def run_chatgpt_web(stage, output, manifest, context):
 
     native.run_profile_parsers = parse_collected
     result = native.run_team_share_only("chatgpt_web", str(output), input_root=str(stage),
+        progress=reporter,
         source_context={"source": context["source"], "requested_source": context["source"],
                         "source_type": context["source_type"]})
     path = output / "parsed_artifacts.json"
@@ -180,6 +225,7 @@ def run_chatgpt_web(stage, output, manifest, context):
     path.write_text(json.dumps(document, ensure_ascii=False, indent=2), encoding="utf-8")
     for problem in diagnostics:
         print(f"  {problem.stage}: {problem.message}", flush=True)
+    reporter.print_summary(result, time.perf_counter() - started)
     # This native tool publishes three files. Do not rename/add report formats.
     return int(result["status"] != "completed")
 

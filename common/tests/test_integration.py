@@ -91,6 +91,13 @@ def test_failed_browser_is_unknown_not_positive(tmp_path):
     assert not any(a.detect_environments(tmp_path, doc)[0].values())
 
 
+def test_failed_app_artifact_is_not_a_detected_environment(tmp_path):
+    item = record(tmp_path, r"C:\Users\u\.codex\auth.json", b"",
+                  ["login_auth"], failed=True)
+    detected, errors = a.detect_environments(tmp_path, manifest([item]))
+    assert not errors and not any(detected.values())
+
+
 def test_export_preserves_hashes_paths_and_failures(mixed, tmp_path):
     root, doc = mixed
     stage = tmp_path / "export"
@@ -170,7 +177,7 @@ def test_redaction_preserves_embedded_json_and_short_cookie_values(tmp_path):
     assert '[redacted]' in (tmp_path / "LLM_Artifact_Report.csv").read_text(encoding="utf-8-sig")
 
 
-def test_full_mixed_run_publishes_only_the_two_selected_environments(mixed, tmp_path):
+def test_full_mixed_run_publishes_only_the_two_selected_environments(mixed, tmp_path, capfd):
     root, doc = mixed
     def collect(source, work):
         import shutil
@@ -182,6 +189,12 @@ def test_full_mixed_run_publishes_only_the_two_selected_environments(mixed, tmp_
     assert {p.name for p in output.iterdir()} == {"chatgpt_web", "claude_app"}
     assert {p.name for p in (output / "claude_app").iterdir()} == set(FOUR_FILES)
     assert {p.name for p in (output / "chatgpt_web").iterdir()} == set(FOUR_FILES[1:])
+    console = capfd.readouterr().out
+    first = console.index("  ChatGPT Web", console.index("Target:"))
+    separator = console.index("=" * 72, first)
+    second = console.index("  Claude Desktop", separator)
+    assert first < separator < second
+    assert console.count("Total execution time:") >= 2
 
 
 def test_refuses_changed_snapshot_archive(mixed, tmp_path):

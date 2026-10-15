@@ -178,6 +178,10 @@ def detect_environments(root, manifest):
         "claude_app": re.compile(rb"claude_(?:[0-9]|pzs8sxrjxfjjc)|claude\.exe|pynhqr\.rkr", re.I),
     }
     for record in manifest["files"]:
+        # A discovered path that could not be acquired is not an analyzable
+        # environment trace. Keep its failure in the manifest instead.
+        if record.get("status") != "ok":
+            continue
         source = record["source_path"]
         low = source.replace("/", "\\").lower()
         ids = set(record.get("definition_ids", []))

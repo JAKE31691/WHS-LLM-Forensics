@@ -82,9 +82,13 @@ def run(source, output, *, acquire_fn=acquire, detect_fn=detect_environments,
         context.write_text(json.dumps({"source": source,
             "source_type": "Live system" if source == "live" else "E01",
             "detection": detections}, ensure_ascii=False), encoding="utf-8")
+        analyzed = 0
         for name in ENVIRONMENTS:
             if not detections[name]:
                 continue
+            if analyzed:
+                print("\n" + "=" * 72, flush=True)
+            analyzed += 1
             destination = output / name
             stage = work / name
             try:
