@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import importlib
 import json
 import os
 from pathlib import Path
@@ -96,6 +97,22 @@ def validate_arguments(argv=None):
     return args.source, output.resolve()
 
 
+def check_e01_runtime():
+    """Report the actual interpreter and missing reader modules before access."""
+    missing = []
+    for module in ("pyewf", "pytsk3", "Registry"):
+        try:
+            importlib.import_module(module)
+        except (ImportError, OSError) as exc:
+            missing.append(f"{module} ({type(exc).__name__}: {exc})")
+    if sys.maxsize <= 2**32 or missing:
+        detail = ", ".join(missing) if missing else "32-bit Python"
+        raise RuntimeError(
+            f"E01 reader unavailable in {sys.executable}: {detail}. "
+            "Install common/requirements.txt into a supported 64-bit Python 3.12 environment."
+        )
+
+
 def run_worker(environment, stage, destination, context, *, runner=subprocess.run):
     command = [sys.executable, "-u", str(ROOT / "worker.py"), environment,
                str(stage), str(destination), str(context)]
@@ -168,6 +185,8 @@ def run(source, output, *, acquire_fn=acquire, detect_fn=detect_environments,
 def main(argv=None):
     source, output = validate_arguments(argv)
     try:
+        if source != "live":
+            check_e01_runtime()
         return run(source, output)
     except Exception as exc:
         print(f"Error: {exc}", file=sys.stderr)

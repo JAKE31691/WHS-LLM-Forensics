@@ -236,6 +236,19 @@ def test_cli_rejects_missing_source_and_relative_output(tmp_path):
     assert exc.value.code == 2
 
 
+def test_e01_runtime_names_missing_module_and_interpreter(monkeypatch):
+    imported = []
+    def imported_module(name):
+        imported.append(name)
+        if name == "pytsk3":
+            raise ModuleNotFoundError("No module named 'pytsk3'")
+    monkeypatch.setattr(integrated.importlib, "import_module", imported_module)
+    with pytest.raises(RuntimeError, match="pytsk3") as exc:
+        integrated.check_e01_runtime()
+    assert "python" in str(exc.value).lower()
+    assert imported == ["pyewf", "pytsk3", "Registry"]
+
+
 @pytest.mark.parametrize("mode", ["live", "fixture.E01"])
 def test_shared_acquisition_uses_same_read_only_pipeline(tmp_path, mode):
     native, _ = a.backend()

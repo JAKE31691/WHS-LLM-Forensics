@@ -27,9 +27,12 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m pip install --only-binary=zstd -r requirements.txt
 ```
 
-실행기는 `common\.venv`, 저장소 루트의 `.venv`, `py -3.12` 순으로 Python을
-찾습니다. 분석 시 외부 프로그램의 CLI 설치는 필요하지 않습니다.
-필요한 포렌식 라이브러리가 없으면 해당 수집/파싱 오류를 출력합니다.
+실행기는 `common\.venv`, 저장소 루트의 `.venv`,
+`chatgpt_app\.venv`, 저장소 부모의 `.venv`, `py -3.12` 순으로 확인합니다.
+Python 3.12 x64와 E01 읽기 모듈(`pyewf`, `pytsk3`, `Registry`)이 모두 준비된
+환경만 선택합니다. 기존 ChatGPT Desktop 도구가 사용하는 가상환경도 재사용할
+수 있습니다. 사용할 수 있는 환경이 없으면 명확한 설치 오류를 출력합니다.
+분석 시 외부 프로그램의 CLI 설치는 필요하지 않습니다.
 
 ## 기존 도구와의 연결
 
