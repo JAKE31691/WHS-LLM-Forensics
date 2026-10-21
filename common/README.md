@@ -43,7 +43,7 @@ Python 모듈(`main`, `parsers` 등)이 서로 충돌하지 않게 합니다.
 | 환경 | 호출하는 기존 코드 | 결과 파일 |
 |---|---|---|
 | chatgpt_app | `chatgpt_app`의 파서·판정 규칙·보고 함수 | `collected_artifacts.zip`, `parsed_artifacts.json`, `LLM_Artifact_Report.csv`, `LLM_Artifact_Report.html` |
-| chatgpt_web | `chatgpt_web/LLMTrace_최종본`의 `chatgpt_web` 프로필 | `parsed_artifacts.json`, `LLM_Artifact_Report.csv`, `LLM_Artifact_Report.html` |
+| chatgpt_web | `chatgpt_web/LLMTrace_최종본_찐.zip`을 임시 폴더에 푼 뒤 `chatgpt_web` 프로필 사용 | `parsed_artifacts.json`, `LLM_Artifact_Report.csv`, `LLM_Artifact_Report.html` |
 | claude_app | `claude_app/tools/actrace` | `collected_artifacts.zip`, `parsed_artifacts.json`, `LLM_Artifact_Report.csv`, `LLM_Artifact_Report.html` |
 | claude_web | `claude_web/tools` | `LLM_Artifacts.zip`, `parsed_artifacts.json`, `LLM_Artifact_Report.csv`, `LLM_Artifact_Report.html` |
 

@@ -15,7 +15,17 @@ COMMON = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(COMMON))
 import acquisition as a
 import main as integrated
-from worker import SnapshotSource, FOUR_FILES, redact_public_outputs
+from worker import SnapshotSource, FOUR_FILES, redact_public_outputs, extract_chatgpt_web_source
+
+
+def test_chatgpt_web_source_comes_from_final_archive(tmp_path):
+    archive = a.REPOSITORY / "chatgpt_web" / "LLMTrace_최종본_찐.zip"
+    with zipfile.ZipFile(archive) as source:
+        member = next(name for name in source.namelist()
+                      if name.endswith("/llmtrace/core/team_share_only.py"))
+        expected = source.read(member)
+    unpacked = extract_chatgpt_web_source(tmp_path / "source")
+    assert (unpacked / "llmtrace" / "core" / "team_share_only.py").read_bytes() == expected
 
 
 def record(root, source, data, ids, *, failed=False):

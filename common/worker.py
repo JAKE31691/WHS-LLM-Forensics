@@ -14,6 +14,7 @@ import shutil
 import sys
 import tempfile
 import time
+import zipfile
 
 from acquisition import REPOSITORY, member_path, write_archive
 
@@ -185,9 +186,56 @@ def run_chatgpt_app(stage, output, manifest, context):
     return int(bool(counts.get("failed") or counts.get("collection_failed")))
 
 
+def extract_chatgpt_web_source(destination):
+    """Unpack the pinned ChatGPT Web source into a private temporary directory."""
+    archive = REPOSITORY / "chatgpt_web" / "LLMTrace_최종본_찐.zip"
+    destination = Path(destination)
+    seen = set()
+    root = None
+    with zipfile.ZipFile(archive) as source:
+        for entry in source.infolist():
+            name = entry.filename
+            parts = name.rstrip("/").split("/")
+            if (not parts or any(part in ("", ".", "..") for part in parts)
+                    or "\\" in name or ":" in name or name.startswith("/")):
+                raise ValueError(f"Unsafe ChatGPT Web archive member: {name}")
+            if root is None:
+                root = parts[0]
+            if parts[0] != root:
+                raise ValueError("ChatGPT Web archive has multiple source roots")
+            if (entry.external_attr >> 16) & 0o170000 == 0o120000:
+                raise ValueError(f"ChatGPT Web archive contains a symbolic link: {name}")
+            if len(parts) == 1:
+                if not entry.is_dir():
+                    raise ValueError("ChatGPT Web archive root is not a directory")
+                continue
+            relative = tuple(parts[1:])
+            if relative in seen:
+                raise ValueError(f"Duplicate ChatGPT Web archive member: {name}")
+            seen.add(relative)
+            target = destination.joinpath(*relative)
+            if entry.is_dir():
+                target.mkdir(parents=True, exist_ok=True)
+            else:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                with source.open(entry) as original, target.open("xb") as extracted:
+                    shutil.copyfileobj(original, extracted)
+    if not (destination / "llmtrace" / "core" / "team_share_only.py").is_file():
+        raise ValueError("ChatGPT Web archive lacks its analysis module")
+    return destination
+
+
 def run_chatgpt_web(stage, output, manifest, context):
-    # Explicit source selection: the repository's final ChatGPT Web version.
-    sys.path.insert(0, str(REPOSITORY / "chatgpt_web" / "LLMTrace_최종본"))
+    with tempfile.TemporaryDirectory(prefix=".chatgpt-web-source-") as temporary:
+        source = extract_chatgpt_web_source(temporary)
+        sys.path.insert(0, str(source))
+        try:
+            return _run_chatgpt_web_native(stage, output, manifest, context)
+        finally:
+            sys.path.remove(str(source))
+
+
+def _run_chatgpt_web_native(stage, output, manifest, context):
     from llmtrace.core import team_share_only as native
     from llmtrace.cli_output import ConsoleReporter
     from llmtrace.core.profile import load_profile
