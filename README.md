@@ -8,7 +8,7 @@ Windows 11의 ChatGPT와 Claude 사용 흔적을 수집·파싱하고, 명시된
 | --- | --- | --- |
 | 통합 도구 | [`common/`](common/) | ChatGPT Desktop·Web, Claude Desktop·Web의 흔적을 확인하고 발견된 환경만 분석. [실행 안내](common/README.md) |
 | 개별 도구 | [`chatgpt_app/`](chatgpt_app/) | ChatGPT Desktop만 분석. [실행 안내](chatgpt_app/README.md) |
-| 개별 도구 | [`chatgpt_web/`](chatgpt_web/) | ChatGPT Web만 분석. [실행 안내](chatgpt_web/LLMTrace_최종본/README.md) |
+| 개별 도구 | [`chatgpt_web/`](chatgpt_web/) | ChatGPT Web만 분석. [폴더 안내 및 실행 방법](chatgpt_web/README.md) |
 | 개별 도구 | [`claude_app/`](claude_app/) | Claude Desktop만 분석. [실행 안내](claude_app/README.md) |
 | 개별 도구 | [`claude_web/`](claude_web/) | Claude Web만 분석. [실행 안내](claude_web/tools/README.md) |
 | 문서 | [`docs/`](docs/) | 설계 및 실험 문서 |

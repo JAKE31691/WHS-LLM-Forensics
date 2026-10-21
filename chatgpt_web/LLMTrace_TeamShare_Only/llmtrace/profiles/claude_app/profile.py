@@ -1,5 +1,0 @@
-PROFILE_ID = 'claude_app'
-SERVICE = 'Claude'
-SURFACE = 'app'
-PROFILE_VERSION = '0.1'
-DESCRIPTION = 'Claude Desktop/App profile; acquisition paths migrated from the original Claude prototype.'

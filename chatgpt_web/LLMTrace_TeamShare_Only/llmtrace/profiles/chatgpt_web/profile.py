@@ -1,5 +1,0 @@
-PROFILE_ID = 'chatgpt_web'
-PROFILE_VERSION = '0.1'
-SERVICE = 'ChatGPT'
-SURFACE = 'web'
-DESCRIPTION = 'ChatGPT Web forensic profile derived from A01-A13 experiments.'
