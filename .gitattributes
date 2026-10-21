@@ -1,5 +1,0 @@
-chatgpt_app/도구결과물_예시/collected_artifacts.zip filter=lfs diff=lfs merge=lfs -text
-chatgpt_app/도구결과물_예시/parsed_artifacts.json filter=lfs diff=lfs merge=lfs -text
-chatgpt_app/도구결과물_예시/LLM_Artifact_Report.csv filter=lfs diff=lfs merge=lfs -text
-chatgpt_app/도구결과물_예시/LLM_Artifact_Report.html filter=lfs diff=lfs merge=lfs -text
-chatgpt_app/도구결과물_예시/E01_도구출력물예시.zip filter=lfs diff=lfs merge=lfs -text

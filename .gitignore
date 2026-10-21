@@ -8,3 +8,10 @@ __pycache__/
 수집물/
 runs/
 out/
+
+# Generated analysis results (keep code and test fixtures in the repository)
+/chatgpt_app/도구결과물_예시/
+/chatgpt_web/LLMTrace_10.10 수정본/출력물.zip
+/chatgpt_web/LLMTrace_최종본/결과물 예시.zip
+/claude_app/demo_result/
+/claude_web/도구 테스트 (E01)/

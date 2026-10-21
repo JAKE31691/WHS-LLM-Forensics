@@ -25,11 +25,6 @@ claude_app/
     chattrace/          ChatTrace 패키지 — ActTrace 가 import 한다
       image/            E01 / dd / vmdk 직접 읽기 (마운트 안 한다)
     tests/              통제 테스트 17개
-  demo_result/
-    ActTrace_팀형식/     팀 합의 산출물 (S01 T8-pre) — csv · html · json
-    ActTrace/           실측 산출물 11종 (T7, 10-10 판)
-    ChatTrace/          실측 산출물 8종
-  산출물-설명.md
 ```
 
 `actrace` 와 `chattrace` 는 **별개 패키지 둘**이다. 한 폴더에 같이 있는
@@ -76,21 +71,19 @@ ActTrace.cmd "D:\사건\CASE01.E01" claude-desktop/msix "C:\사건\CASE01-행위
 **요약**이고, 어느 추론이 어느 관찰에서 나왔는지는 `behaviors.csv` 의
 `supported_by` · `source_artifacts` 와 `observations.jsonl` 에 그대로 남는다.
 
-나머지 산출물 전부는 [산출물-설명.md](산출물-설명.md) 에 파일마다 열 수 ·
-줄 수 · 크기까지 실측값으로 적어 뒀다.
+실행 결과는 사용자가 지정한 출력 폴더에 생성된다. 예시 결과 파일은
+저장소에 포함하지 않는다.
 
 ## 검증 상태
 
-`demo_result/` 는 **실제 실험 수집물(T7)을 돌린 결과 그대로**다. 합성 표본이
-아니다.
+다음 수치는 실제 실험 수집물(T7)의 검증 기록이다. 결과 파일은 저장소에서
+제외했다.
 
 | | 수치 |
 |---|---|
 | 관찰 | 583건 (아티팩트 9종) |
 | 추론 | 74건 · 규칙 **34종** |
-| 판정 | `summary.txt` 참고 |
-| 통일 4열 | `report.csv` 참고 |
-| 못 읽은 것 | 3건 (UserAssist 키 부재, `problems.csv` 에 신고) |
+| 못 읽은 것 | 3건 (UserAssist 키 부재) |
 
 행위 Rule 은 **실측으로 맞춰 본 것**이다. 몇 가지만 들면,
 
@@ -299,9 +292,7 @@ R-UPLOAD-LOCALPATH-01              규칙 ID
   ▸ 원본 근거 보기
 ```
 
-`demo_result/ActTrace_팀형식/` 에 S01 T8-pre(로그아웃 전 수집물) 결과를
-뒀다. **zip 은 깃에 넣지 않는다** — 테스트 계정의 `Cookies` DB 와
-`NTUSER.DAT` 원본이 그대로 들어 있다. 도구를 돌리면 같은 자리에 생긴다.
+S01 T8-pre(로그아웃 전 수집물) 결과와 원본 증거는 저장소에 포함하지 않는다.
 
 ## 2026-10-14 — 업로드 경로 끝의 `{` (업로드 8건 → 4건)
 
